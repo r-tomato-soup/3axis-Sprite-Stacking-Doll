@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>全角度ドット絵立体ビューア — CHARACTER 2 &amp; うさぎ</title>
+  <meta name="description" content="3軸積層スプライト＆3Dボクセルで全角度から鑑賞・塗り直しできるドット絵立体ビューア">
+  <!-- ローカルHTTPサーバ実行時に /favicon.ico の404ネットワークエラーを出さないためインラインSVGを採用 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231e2028'/%3E%3Crect x='8' y='6' width='16' height='14' fill='%23f3eee4'/%3E%3Crect x='10' y='20' width='12' height='7' fill='%23ffffff'/%3E%3Crect x='11' y='13' width='3' height='2' fill='%238d84a8'/%3E%3Crect x='18' y='13' width='3' height='2' fill='%238d84a8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app-shell" class="app-shell">
+    <header id="topbar" class="topbar">
+      <div class="brand-group">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="cube-dot dot-x"></span>
+          <span class="cube-dot dot-y"></span>
+          <span class="cube-dot dot-z"></span>
+        </div>
+        <div class="brand-titles">
+          <h1 id="brand-title">CHARACTER 2 <span>立体ドット絵ビューア</span></h1>
+          <p class="brand-sub">3軸積層スプライト &amp; ボクセル全角度検証スタジオ</p>
+        </div>
+        <span id="asset-status-badge" class="status-pill" data-state="loading">読込中...</span>
+        <div id="topbar-char-host" class="slot-host">
+          <div id="character-switcher" class="segmented-group char-switcher" role="group" aria-label="キャラ切替">
+            <span class="group-caption">キャラ</span>
+          </div>
+        </div>
+        <div id="topbar-version-host" class="slot-host">
+          <div id="version-switcher" class="segmented-group version-switcher" role="group" aria-label="バージョン比較">
+            <span class="group-caption">版比較</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="topbar-bg-host" class="slot-host">
+          <div id="bg-switcher" class="segmented-group" role="group" aria-label="背景切替">
+            <span class="group-caption">背景</span>
+            <button type="button" class="seg-btn is-active" data-bg="dark">ダーク</button>
+            <button type="button" class="seg-btn" data-bg="slate">灰</button>
+            <button type="button" class="seg-btn" data-bg="light">ライト</button>
+            <button type="button" class="seg-btn" data-bg="checker">市松</button>
+          </div>
+        </div>
+
+        <div id="topbar-util-host" class="slot-host util-host">
+          <button type="button" id="toggle-grid" class="ghost-btn" aria-pressed="false" title="足元の基準ガイドリングを表示">
+            台座: OFF
+          </button>
+
+          <button type="button" id="open-strip-modal" class="ghost-btn">
+            スライス原画
+          </button>
+        </div>
+
+        <button type="button" id="btn-collapse-all" class="ghost-btn" title="左右パネルを閉じてビューアを全画面表示">
+          パネルを閉じる
+        </button>
+      </div>
+    </header>
+
+    <div id="workspace-grid" class="workspace-grid">
+      <aside id="left-sidebar" class="control-sidebar" aria-label="描画・カメラ・検証コントロール">
+        <section id="slot-render" class="panel-section">
+          <div class="section-header">
+            <h2>描画モード</h2>
+            <span class="section-tag">3方式比較</span>
+          </div>
+
+          <div class="mode-cards" role="radiogroup" aria-label="レンダリングモード選択">
+            <button type="button" class="mode-card is-active" data-mode="tri" role="radio" aria-checked="true">
+              <div class="mode-card-head">
+                <span class="mode-index">MODE 1</span>
+                <span class="mode-badge recommended">標準</span>
+              </div>
+              <div class="mode-title">全角度・3軸積層スプライト</div>
+              <div class="mode-desc">視線ベクトルから X / Y / Z スライスを自動選択し2DスラブDDAで連続描画。</div>
+            </button>
+
+            <button type="button" class="mode-card" data-mode="classic-y" role="radio" aria-checked="false">
+              <div class="mode-card-head">
+                <span class="mode-index">MODE 2</span>
+                <span class="mode-badge">比較用</span>
+              </div>
+              <div class="mode-title">従来型・1軸積層スプライト</div>
+              <div class="mode-desc">上下スライス（slices_y.png）のみを使用。水平アングルとの見え方を比較。</div>
+            </button>
+
+            <div id="classic-subcontrols" class="mode-subbox" hidden>
+              <div class="subbox-row">
+                <span class="subbox-label">厚み押し出し補完 (Extrusion)</span>
+                <button type="button" id="toggle-classic-extrude" class="toggle-chip" aria-pressed="false">OFF</button>
+              </div>
+              <p class="subbox-note">OFFは従来薄板積層、ONでYスライス厚みを補完します。</p>
+            </div>
+
+            <button type="button" class="mode-card" data-mode="voxel" role="radio" aria-checked="false">
+              <div class="mode-card-head">
+                <span class="mode-index">MODE 3</span>
+                <span class="mode-badge">3Dメッシュ</span>
+              </div>
+              <div class="mode-title">3Dピクセル・ボクセル</div>
+              <div class="mode-desc">隣接面カリング済み3Dボックスメッシュを平行投影で描画。</div>
+            </button>
+
+            <div id="voxel-subcontrols" class="mode-subbox" hidden>
+              <div class="slider-block compact">
+                <div class="slider-header">
+                  <label for="slider-shading">立体陰影 (Shading)</label>
+                  <output id="val-shading" for="slider-shading">35%</output>
+                </div>
+                <input type="range" id="slider-shading" min="0" max="100" step="1" value="35">
+                <div class="slider-Presets">
+                  <button type="button" class="mini-link" data-shade-preset="0">0% 純色</button>
+                  <button type="button" class="mini-link" data-shade-preset="35">35% 標準</button>
+                  <button type="button" class="mini-link" data-shade-preset="85">85% 強調</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mode-subbox global-snap-box">
+              <div class="subbox-row">
+                <span class="subbox-label">輪郭線 (2D Outline)</span>
+                <button type="button" id="toggle-outline" class="toggle-chip" aria-pressed="true">ON</button>
+              </div>
+              <div class="slider-block compact">
+                <div class="slider-header">
+                  <label for="slider-outline-width">輪郭線の太さ</label>
+                  <output id="val-outline-width" for="slider-outline-width">1.50</output>
+                </div>
+                <input type="range" id="slider-outline-width" min="0.50" max="3.50" step="0.25" value="1.50">
+              </div>
+              <div class="snap-header-row">
+                <span class="subbox-label">ドット角スナップ (Pixel Snap)</span>
+              </div>
+              <div class="segmented-group full-width-seg snap-grid-4" role="group" aria-label="ドット角スナップ解像度">
+                <button type="button" class="seg-btn snap-mode-btn is-active" data-snap="0">OFF</button>
+                <button type="button" class="seg-btn snap-mode-btn" data-snap="3">3x</button>
+                <button type="button" class="seg-btn snap-mode-btn" data-snap="2">2x</button>
+                <button type="button" class="seg-btn snap-mode-btn" data-snap="1">1x</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="slot-camera" class="panel-section">
+          <div class="section-header">
+            <h2>カメラアングル</h2>
+            <button type="button" id="btn-reset-camera" class="text-action-btn" title="カメラ角度・ズーム・パンを初期位置へ戻す">リセット</button>
+          </div>
+
+          <div class="preset-grid">
+            <button type="button" class="preset-btn" data-preset="front">正面<span>Front 0°</span></button>
+            <button type="button" class="preset-btn is-active" data-preset="quarter">斜め俯瞰<span>Quarter 35°</span></button>
+            <button type="button" class="preset-btn" data-preset="side">真横<span>Side 90°</span></button>
+            <button type="button" class="preset-btn" data-preset="back">背面<span>Back 180°</span></button>
+            <button type="button" class="preset-btn" data-preset="top">真上<span>Top +90°</span></button>
+            <button type="button" class="preset-btn" data-preset="low">見上げ<span>Low -25°</span></button>
+          </div>
+
+          <div class="turntable-row">
+            <span class="subbox-label">等速ターンテーブル回転</span>
+            <button type="button" id="toggle-autospin" class="toggle-chip" aria-pressed="false">OFF</button>
+          </div>
+        </section>
+
+        <section id="slot-inspect" class="panel-section">
+          <div class="section-header">
+            <h2>構造インスペクション</h2>
+            <button type="button" id="btn-reset-inspect" class="text-action-btn">初期値に戻す</button>
+          </div>
+
+          <div class="slider-block">
+            <div class="slider-header">
+              <label for="slider-explode">スライス分解 (Explode)</label>
+              <output id="val-explode" for="slider-explode">1.00x</output>
+            </div>
+            <input type="range" id="slider-explode" min="1.00" max="3.00" step="0.02" value="1.00">
+          </div>
+
+          <div class="slider-block">
+            <div class="slider-header">
+              <label for="slider-cutaway">断面カット (Cutaway)</label>
+              <output id="val-cutaway" for="slider-cutaway">0%</output>
+            </div>
+            <input type="range" id="slider-cutaway" min="0" max="100" step="1" value="0">
+          </div>
+
+          <div class="cut-axis-row">
+            <label for="select-cut-axis" class="subbox-label">断面方向</label>
+            <select id="select-cut-axis" class="studio-select">
+              <option value="auto" selected>カメラ手前から自動</option>
+              <option value="y">頭頂から下へ (Y軸)</option>
+              <option value="z">正面から奥へ (Z軸)</option>
+              <option value="x">右側から左へ (X軸)</option>
+            </select>
+          </div>
+        </section>
+      </aside>
+
+      <main class="viewport-stage">
+        <div id="viewport-container" class="viewport-container" data-bg="dark">
+          <canvas id="gl-canvas" aria-label="Character 2 3D ピクセルビューア"></canvas>
+
+          <div class="hud-top-left">
+            <div id="hud-axis-pill" class="axis-pill" data-axis="z">
+              <span class="axis-dot"></span>
+              <span id="hud-axis-text">ACTIVE: Z-Stack (前後スライス)</span>
+            </div>
+            <div id="hud-outline-pill" class="extra-pill">2D Outline 1.50</div>
+            <div id="hud-extra-pill" class="extra-pill" hidden>Pixel Snap 2x</div>
+            <div id="hud-paint-pill" class="extra-pill paint-pill" hidden>塗り直しモード ON</div>
+          </div>
+
+          <div id="paint-toast" class="paint-toast" role="status" aria-live="polite" hidden></div>
+
+          <div class="hud-top-right">
+            <canvas id="axis-gizmo" width="76" height="76" title="右手座標系ガイド (X:右 / Y:上 / Z:正面)"></canvas>
+          </div>
+
+          <div class="hud-bottom-bar">
+            <div class="hud-telemetry" aria-live="polite">
+              <div class="telemetry-item">
+                <span class="tel-label">YAW</span>
+                <span id="hud-yaw" class="tel-value">32.0°</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">PITCH</span>
+                <span id="hud-pitch" class="tel-value">35.0°</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">ZOOM</span>
+                <span id="hud-zoom" class="tel-value">1.00x</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">SLICES</span>
+                <span id="hud-slices" class="tel-value">-- / --</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">VOL</span>
+                <span id="hud-volume" class="tel-value">--</span>
+              </div>
+            </div>
+
+            <div class="hud-controls-hint" id="hud-controls-hint">
+              <span>ドラッグ: 回転</span>
+              <span class="sep">·</span>
+              <span>Shift/右: 移動</span>
+              <span class="sep">·</span>
+              <span>ホイール: 拡縮</span>
+            </div>
+          </div>
+
+          <div id="floating-dock" class="floating-dock" role="toolbar" aria-label="クイック操作">
+            <button type="button" id="floating-autospin" class="m3-pill-btn" aria-pressed="false">
+              自動回転: OFF
+            </button>
+            <button type="button" id="floating-open-menu" class="m3-pill-btn primary">
+              メニューを開く
+            </button>
+          </div>
+
+          <button type="button" id="floating-color-fab" class="floating-color-fab" aria-label="カラーパレット" aria-expanded="false" title="カラーパレットを開閉" style="background-color: #F48FB1;"></button>
+
+          <aside id="floating-mini-palette" class="floating-mini-palette" aria-label="クイック色試しパレット" hidden>
+            <div class="mini-palette-header">
+              <span class="mini-palette-title">カラーパレット</span>
+              <div class="mini-header-actions">
+                <button type="button" id="mini-btn-undo" class="ghost-btn compact-btn" disabled>戻す</button>
+                <button type="button" id="mini-btn-close" class="ghost-btn compact-btn" aria-label="ミニパレットを閉じる">×</button>
+              </div>
+            </div>
+            <div id="mini-palette-body" class="mini-palette-body">
+              <div id="mini-iro-host" class="mini-host"></div>
+              <div id="mini-tabs-host" class="mini-host"></div>
+              <div id="mini-swatches-host" class="mini-host"></div>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <aside id="ref-panel" class="ref-sidebar" aria-label="元絵比較とカラー編集">
+        <div id="slot-reference" class="ref-slot">
+          <div class="ref-header">
+            <div>
+              <h2>元絵比較 (Reference)</h2>
+              <p id="ref-sub-label" class="ref-sub">CHARACTER 2 抽出原画</p>
+            </div>
+          </div>
+
+          <div class="ref-cards-grid">
+            <div class="ref-card">
+              <div class="ref-card-bar">
+                <span id="ref-card1-title" class="ref-card-title">FRONT</span>
+                <button type="button" id="ref-card1-btn" class="mini-snap-btn" data-preset="front">正面</button>
+              </div>
+              <div class="ref-img-frame" data-bg="dark">
+                <img id="ref-front-img" alt="正面リファレンス原画">
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <div class="ref-card-bar">
+                <span id="ref-card2-title" class="ref-card-title">SIDE</span>
+                <button type="button" id="ref-card2-btn" class="mini-snap-btn" data-preset="side">真横</button>
+              </div>
+              <div class="ref-img-frame" data-bg="dark">
+                <img id="ref-side-img" alt="側面または背面リファレンス原画">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section id="slot-paint" class="paint-box" aria-label="カラー編集・塗り直しツール">
+          <div class="paint-head-row">
+            <h3>カラー編集 / 塗り直し</h3>
+            <button type="button" id="toggle-paint-mode" class="toggle-chip" aria-pressed="false">OFF</button>
+          </div>
+
+          <div class="segmented-group full-width-seg scope-grid-3" role="group" aria-label="塗り範囲">
+            <button type="button" id="paint-scope-part" class="seg-btn is-active" data-paint-scope="part">パーツ全体</button>
+            <button type="button" id="paint-scope-connected" class="seg-btn" data-paint-scope="connected">連結同色</button>
+            <button type="button" id="paint-scope-single" class="seg-btn" data-paint-scope="single">1ドット</button>
+          </div>
+
+          <div id="paint-tolerance-block" class="slider-block compact" hidden>
+            <div class="slider-header">
+              <label for="slider-paint-tolerance">色の許容範囲 (Tolerance)</label>
+              <output id="val-paint-tolerance" for="slider-paint-tolerance">24</output>
+            </div>
+            <input type="range" id="slider-paint-tolerance" min="0" max="60" step="1" value="24">
+          </div>
+
+          <div class="subbox-row">
+            <span class="subbox-label">陰影を保つ (Preserve Shading)</span>
+            <button type="button" id="toggle-preserve-shading" class="toggle-chip" aria-pressed="true">ON</button>
+          </div>
+
+          <div id="paint-iro-anchor" class="paint-anchor">
+            <div id="iro-picker-wrap" class="iro-picker-wrap">
+              <div class="iro-col-preview">
+                <div id="paint-color-swatch" class="color-preview-square" style="background-color: #F48FB1;" title="現在の塗り色"></div>
+                <input type="text" id="paint-hex-input" class="iro-hex-input" value="#F48FB1" maxlength="7" spellcheck="false" autocomplete="off" aria-label="16進カラーコード">
+              </div>
+              <div id="iro-wheel-mount" class="iro-mount iro-wheel-mount" aria-label="iro.js カラーホイール"></div>
+              <div class="iro-col-right">
+                <button type="button" id="toggle-eyedropper" class="ghost-btn eyedropper-mini-btn" aria-pressed="false" title="クリックまたはShift+クリックでモデルから色を抽出">スポイト</button>
+                <div id="iro-sliders-mount" class="iro-mount iro-sliders-mount" aria-label="iro.js 彩度・明度スライダー"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="paint-tabs-anchor" class="paint-anchor">
+            <div id="palette-category-tabs" class="palette-cat-tabs" role="tablist" aria-label="部位別カラーパレットカテゴリ"></div>
+          </div>
+
+          <div class="palette-header">
+            <span id="palette-cat-title">部位の元色</span>
+            <span id="palette-count" class="palette-count">0色</span>
+          </div>
+          <div id="paint-swatches-anchor" class="paint-anchor">
+            <div id="palette-swatches" class="palette-swatches"></div>
+          </div>
+
+          <div class="paint-actions-row">
+            <button type="button" id="btn-paint-undo" class="ghost-btn compact-btn" disabled>元に戻す</button>
+            <button type="button" id="btn-paint-reset" class="ghost-btn compact-btn">色を初期化</button>
+          </div>
+          <div class="paint-io-row">
+            <button type="button" id="btn-paint-save-local" class="ghost-btn compact-btn" title="現在の配色をブラウザへ保存">色保存</button>
+            <button type="button" id="btn-paint-load-local" class="ghost-btn compact-btn" disabled title="ブラウザ保存済み配色を復元">復元</button>
+            <button type="button" id="btn-paint-export" class="ghost-btn compact-btn">JSON保存</button>
+            <button type="button" id="btn-paint-import" class="ghost-btn compact-btn">JSON読込</button>
+            <input type="file" id="paint-import-input" accept=".json,application/json" hidden>
+          </div>
+          <p id="paint-feedback" class="paint-feedback">塗り直しON時: クリックで塗装 / ドラッグで回転 / Shift+クリックでスポイト</p>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <div id="m3-sheet-overlay" class="m3-sheet-overlay" role="dialog" aria-modal="true" aria-label="ビューア設定メニュー" hidden>
+    <div id="m3-sheet-scrim" class="m3-sheet-scrim"></div>
+    <div id="m3-sheet-surface" class="m3-sheet-surface">
+      <div id="m3-sheet-handle-zone" class="m3-sheet-handle-zone">
+        <div class="m3-sheet-handle" aria-hidden="true"></div>
+      </div>
+
+      <div class="m3-sheet-header">
+        <div class="m3-sheet-title-wrap">
+          <h2 class="m3-sheet-title">CHARACTER 2 設定</h2>
+        </div>
+        <button type="button" id="m3-sheet-close" class="m3-close-btn" aria-label="メニューを閉じる">閉じる</button>
+      </div>
+
+      <div class="m3-tabs" role="tablist" aria-label="メニュータブ">
+        <button type="button" class="m3-tab is-active" role="tab" aria-selected="true" data-sheet-tab="display">表示・描画</button>
+        <button type="button" class="m3-tab" role="tab" aria-selected="false" data-sheet-tab="compare">比較・元絵</button>
+        <button type="button" class="m3-tab" role="tab" aria-selected="false" data-sheet-tab="paint">塗り直し</button>
+      </div>
+
+      <div class="m3-sheet-body">
+        <div id="m3-tab-display" class="m3-tab-panel is-active">
+          <div id="mobile-bg-host" class="mobile-host-block"></div>
+          <div id="mobile-util-host" class="mobile-host-row"></div>
+          <div id="mobile-render-host" class="mobile-host-stack"></div>
+          <div id="mobile-camera-host" class="mobile-host-stack"></div>
+          <div id="mobile-inspect-host" class="mobile-host-stack"></div>
+        </div>
+
+        <div id="m3-tab-compare" class="m3-tab-panel" hidden>
+          <div id="mobile-char-host" class="mobile-host-block"></div>
+          <div id="mobile-version-host" class="mobile-host-block"></div>
+          <div id="mobile-reference-host" class="mobile-host-stack"></div>
+        </div>
+
+        <div id="m3-tab-paint" class="m3-tab-panel" hidden>
+          <div id="mobile-paint-host" class="mobile-host-stack"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="strip-modal" class="strip-modal" role="dialog" aria-modal="true" aria-labelledby="strip-modal-title" hidden>
+    <div class="strip-modal-backdrop" id="strip-modal-backdrop"></div>
+    <div class="strip-modal-dialog">
+      <div class="strip-modal-header">
+        <div>
+          <h2 id="strip-modal-title">3軸スライス原画ストリップ・インスペクタ</h2>
+          <p class="strip-modal-sub">生成された水平パックPNG（slices_y.png / slices_z.png / slices_x.png）のピクセル等倍検証</p>
+        </div>
+        <div class="strip-modal-controls">
+          <div class="segmented-group" role="group" aria-label="ストリップ拡大倍率">
+            <span class="group-caption">倍率</span>
+            <button type="button" class="seg-btn strip-zoom-btn" data-strip-zoom="1">1x</button>
+            <button type="button" class="seg-btn strip-zoom-btn is-active" data-strip-zoom="2">2x</button>
+            <button type="button" class="seg-btn strip-zoom-btn" data-strip-zoom="3">3x</button>
+          </div>
+          <button type="button" id="close-strip-modal" class="ghost-btn">閉じる (Esc)</button>
+        </div>
+      </div>
+
+      <div class="strip-modal-body">
+        <div class="strip-block">
+          <div class="strip-block-head">
+            <div class="strip-title-group">
+              <span class="strip-axis-tag tag-y">Y-Stack</span>
+              <strong>slices_y.png</strong>
+              <span id="meta-slices-y" class="strip-meta">--</span>
+            </div>
+            <span id="hover-slices-y" class="strip-hover-info">スライス上をホバーすると番号を表示</span>
+          </div>
+          <div class="strip-scroll-box">
+            <div class="strip-stage" data-strip-axis="y">
+              <img id="strip-img-y" alt="slices_y.png 水平ストリップ">
+              <div class="strip-highlight" hidden></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strip-block">
+          <div class="strip-block-head">
+            <div class="strip-title-group">
+              <span class="strip-axis-tag tag-z">Z-Stack</span>
+              <strong>slices_z.png</strong>
+              <span id="meta-slices-z" class="strip-meta">--</span>
+            </div>
+            <span id="hover-slices-z" class="strip-hover-info">スライス上をホバーすると番号を表示</span>
+          </div>
+          <div class="strip-scroll-box">
+            <div class="strip-stage" data-strip-axis="z">
+              <img id="strip-img-z" alt="slices_z.png 水平ストリップ">
+              <div class="strip-highlight" hidden></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strip-block">
+          <div class="strip-block-head">
+            <div class="strip-title-group">
+              <span class="strip-axis-tag tag-x">X-Stack</span>
+              <strong>slices_x.png</strong>
+              <span id="meta-slices-x" class="strip-meta">--</span>
+            </div>
+            <span id="hover-slices-x" class="strip-hover-info">スライス上をホバーすると番号を表示</span>
+          </div>
+          <div class="strip-scroll-box">
+            <div class="strip-stage" data-strip-axis="x">
+              <img id="strip-img-x" alt="slices_x.png 水平ストリップ">
+              <div class="strip-highlight" hidden></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/vendor/iro.min.js"></script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

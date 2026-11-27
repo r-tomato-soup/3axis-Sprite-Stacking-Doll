@@ -1,0 +1,96 @@
+{
+  "defaultCharacter": "char2",
+  "defaultVersion": "v4",
+  "versions": [
+    {
+      "id": "v1",
+      "label": "v1: 初期版",
+      "shortLabel": "v1",
+      "description": "初期プロトタイプ（後方カーブのツインテール・枠付きリボン）",
+      "basePath": "assets/versions/v1",
+      "model": "assets/versions/v1/model.json"
+    },
+    {
+      "id": "v2",
+      "label": "v2: 造形改善",
+      "shortLabel": "v2",
+      "description": "ツインテール垂直軌道化・純白蝶リボン・丸頬バランス調整",
+      "basePath": "assets/versions/v2",
+      "model": "assets/versions/v2/model.json"
+    },
+    {
+      "id": "v3",
+      "label": "v3: 腕・線画強化",
+      "shortLabel": "v3",
+      "description": "独立ベルスリーブ腕・内部主線強調・斜め視点の目割れ防止",
+      "basePath": "assets/versions/v3",
+      "model": "assets/versions/v3/model.json"
+    },
+    {
+      "id": "v4",
+      "label": "v4: 最新(縦ロール)",
+      "shortLabel": "v4 最新",
+      "description": "3D立体螺旋の縦ロール造形・自然な髪色陰影（最新確定版）",
+      "basePath": "assets",
+      "model": "assets/model.json"
+    }
+  ],
+  "characters": [
+    {
+      "id": "char2",
+      "name": "CHARACTER 2",
+      "shortLabel": "CHARACTER 2",
+      "defaultVersion": "v4",
+      "versions": [
+        {
+          "id": "v1",
+          "label": "v1: 初期版",
+          "shortLabel": "v1",
+          "description": "初期プロトタイプ（後方カーブのツインテール・枠付きリボン）",
+          "basePath": "assets/versions/v1",
+          "model": "assets/versions/v1/model.json"
+        },
+        {
+          "id": "v2",
+          "label": "v2: 造形改善",
+          "shortLabel": "v2",
+          "description": "ツインテール垂直軌道化・純白蝶リボン・丸頬バランス調整",
+          "basePath": "assets/versions/v2",
+          "model": "assets/versions/v2/model.json"
+        },
+        {
+          "id": "v3",
+          "label": "v3: 腕・線画強化",
+          "shortLabel": "v3",
+          "description": "独立ベルスリーブ腕・内部主線強調・斜め視点の目割れ防止",
+          "basePath": "assets/versions/v3",
+          "model": "assets/versions/v3/model.json"
+        },
+        {
+          "id": "v4",
+          "label": "v4: 最新(縦ロール)",
+          "shortLabel": "v4 最新",
+          "description": "3D立体螺旋の縦ロール造形・自然な髪色陰影（最新確定版）",
+          "basePath": "assets",
+          "model": "assets/model.json"
+        }
+      ]
+    },
+    {
+      "id": "bunny",
+      "name": "うさぎのぬいぐるみ",
+      "shortLabel": "うさぎ",
+      "defaultVersion": "bunny_v1",
+      "versions": [
+        {
+          "id": "bunny_v1",
+          "label": "v1: お座りぬいぐるみ",
+          "shortLabel": "v1",
+          "description": "くすみモーヴのうさぎぬいぐるみ（白い×目・前後リボン・丸しっぽ）",
+          "basePath": "./assets/bunny/",
+          "model": "./assets/bunny/model.json"
+        }
+      ]
+    }
+  ]
+}
