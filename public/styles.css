@@ -1775,7 +1775,6 @@ body.panels-collapsed .floating-color-fab {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-rows: 1fr;
-    background: var(--sheet-bg);
   }
   .topbar,
   .control-sidebar,
@@ -1789,17 +1788,16 @@ body.panels-collapsed .floating-color-fab {
     grid-template-columns: 1fr;
     align-items: start;
   }
+  /* ステージ背景は常に100dvh全面を維持し、角丸裏やシートのドラッグ・開閉中にも下地の四角い帯が見えないようにする */
   .viewport-stage {
     width: 100%;
     height: 100dvh;
+  }
+  #gl-canvas {
     transition: height 0.24s cubic-bezier(0.2, 0, 0, 1);
   }
-  /* シート上端の角丸(24px)裏までライブ背景を28px伸ばして角の三角隙間を防ぎ、描画キャンバス自体は可視上半分に厳密一致させる */
-  body.mobile-sheet-open .viewport-stage {
-    height: calc(100dvh - var(--mobile-sheet-height) + 28px);
-  }
   body.mobile-sheet-open #gl-canvas {
-    height: calc(100% - 28px);
+    height: calc(100dvh - var(--mobile-sheet-height));
   }
   .floating-options-bar {
     display: inline-flex;
