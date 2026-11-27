@@ -1,5 +1,5 @@
 import { buildVoxelMeshBuffers } from './mesh.js';
-import { computeCameraBasis, createOrthoMatrix, createViewMatrix, DEG_TO_RAD, multiplyMat4, selectDominantAxis } from './math.js';
+import { createOrthoMatrix, createViewMatrix, multiplyMat4, selectDominantAxis } from './math.js';
 
 /**
  * 離散サブレイヤー板を複数枚重ねる従来手法では、顔の曲面段差（斜め隣接ボクセル境界）において
@@ -685,14 +685,7 @@ export class Pseudo3DRenderer {
     const gl = this.gl;
     const canvasW = this.canvas.width;
     const canvasH = this.canvas.height;
-    let basis = camera.getBasis();
-
-    // 従来型Y-Stack（Mode 2）では水平0°でXZ平面ポリゴンが面積ゼロに退化して完全消失するため、
-    // ごく微小な見下ろし角（3.2°）を下限として従来のブラインド状の層隙間・押し出し比較を視認可能にする
-    if (state.mode === 'classic-y' && Math.abs(camera.pitchDeg) < 3.2) {
-      const grazedPitch = camera.pitchDeg >= 0 ? 3.2 : -3.2;
-      basis = computeCameraBasis(camera.yawDeg * DEG_TO_RAD, grazedPitch * DEG_TO_RAD);
-    }
+    const basis = camera.getBasis();
 
     const dominantAxis = selectDominantAxis(basis.back, this.currentActiveAxis);
     this.currentActiveAxis = dominantAxis;
@@ -799,9 +792,7 @@ export class Pseudo3DRenderer {
     }
 
     const axisKeyToInt = { x: 0, y: 1, z: 2 };
-    const cutAxisKey = state.cutAxis === 'auto'
-      ? (state.mode === 'classic-y' ? 'y' : dominantAxis)
-      : state.cutAxis;
+    const cutAxisKey = state.cutAxis === 'auto' ? dominantAxis : state.cutAxis;
     const cutAxisInt = axisKeyToInt[cutAxisKey];
     const cutTotal = cutAxisInt === 0
       ? this.asset.size.x
@@ -841,8 +832,8 @@ export class Pseudo3DRenderer {
     let telemetrySlicesText = `${cutVisibleSlices} / ${cutTotal}`;
     let hudAxisKey = dominantAxis;
 
-    if (state.mode === 'tri' || state.mode === 'classic-y') {
-      const stackKey = state.mode === 'classic-y' ? 'y' : dominantAxis;
+    if (state.mode === 'tri') {
+      const stackKey = dominantAxis;
       hudAxisKey = stackKey;
       const axisInt = axisKeyToInt[stackKey];
       const strip = this.asset.strips[stackKey];
@@ -850,9 +841,7 @@ export class Pseudo3DRenderer {
       const frontPositive = basis.back[axisInt] >= 0 ? 1 : 0;
 
       let slabThickness = 1.0;
-      if (state.mode === 'classic-y' && !state.classicExtrude) {
-        slabThickness = 0.08;
-      } else if (state.explode > 1.01) {
+      if (state.explode > 1.01) {
         // 分解スライダ操作時に斜め視点で隣接スライスの押し出し厚みが癒着して見えるのを防ぐため、1.0x超では急速に薄層シートへ絞る
         const t = Math.min(1.0, (state.explode - 1.0) / 0.45);
         slabThickness = 1.0 - t * 0.88;

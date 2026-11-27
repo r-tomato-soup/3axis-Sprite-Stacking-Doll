@@ -5,7 +5,7 @@ export function hexToRgbBytes(hex) {
 }
 
 /**
- * ストリップPNGの欠損時・ペイント編集直後・開発用プレースホルダー表示時に、
+ * ストリップPNGの欠損時・ペイント編集直後・モッズ合成時・開発用プレースホルダー表示時に、
  * @sculptor との共有コントラクトと完全に一致する3軸ストリップ画素列をメモリ上で合成する。
  */
 export function buildStripBuffersFromVoxels(size, paletteRgb, voxels) {
@@ -66,43 +66,145 @@ export function rgbaBufferToDataUrl(width, height, rgbaBytes) {
   return c.toDataURL('image/png');
 }
 
-function renderOrthoProjectionDataUrl(size, paletteRgb, voxels, mode) {
-  const { x: W, y: H, z: D } = size;
-  const outW = mode === 'front' ? W : D;
-  const outH = H;
-  const pixels = new Uint8Array(outW * outH * 4);
-  const depth = new Int16Array(outW * outH).fill(-32768);
+function normalizeModsList(rawMods) {
+  if (!Array.isArray(rawMods)) return [];
+  return rawMods
+    .filter((m) => m && typeof m === 'object' && m.id)
+    .map((m) => ({
+      id: String(m.id),
+      label: String(m.label || m.id),
+      defaultEnabled: Boolean(m.defaultEnabled),
+      offsetWhen: m.offsetWhen && typeof m.offsetWhen === 'object' ? m.offsetWhen : null,
+      remove: Array.isArray(m.remove) ? m.remove : [],
+      add: Array.isArray(m.add) ? m.add : [],
+    }));
+}
 
-  for (let i = 0; i < voxels.length; i++) {
-    const [vx, vy, vz, pIdx] = voxels[i];
-    const rgb = paletteRgb[pIdx] || [255, 255, 255];
-    let px;
-    let dScore;
-    if (mode === 'front') {
-      px = vx;
-      dScore = vz;
-    } else {
-      // リファレンス SIDE は左向き（画面左が +Z 正面、画面右が -Z 背面）のため -X 側ではなく +X 側からの投影に揃える
-      px = D - 1 - vz;
-      dScore = vx;
-    }
-    const py = H - 1 - vy;
-    const cell = py * outW + px;
-    if (dScore >= depth[cell]) {
-      depth[cell] = dScore;
-      const o = cell * 4;
-      pixels[o] = rgb[0];
-      pixels[o + 1] = rgb[1];
-      pixels[o + 2] = rgb[2];
-      pixels[o + 3] = 255;
+/**
+ * ベースボクセル配列へ有効なモッズ差分を順番に適用し、WebGL描画・ペイント用のボクセル配列と
+ * 3軸ストリップバッファを再構築する。他の有効モッズに応じた offsetWhen オフセットも加算する。
+ */
+export function composeAssetVoxels(asset, activeModIds = null) {
+  const size = asset?.size || { x: 0, y: 0, z: 0 };
+  const { x: W, y: H, z: D } = size;
+  const total = W * H * D;
+  const baseVoxels = Array.isArray(asset?.baseVoxels)
+    ? asset.baseVoxels
+    : (Array.isArray(asset?.voxels) ? asset.voxels : []);
+  const mods = Array.isArray(asset?.mods) ? asset.mods : [];
+  const paletteRgb = Array.isArray(asset?.basePaletteRgb)
+    ? asset.basePaletteRgb
+    : (Array.isArray(asset?.paletteRgb) ? asset.paletteRgb : []);
+
+  const activeSet = activeModIds == null
+    ? new Set(mods.filter((m) => m.defaultEnabled).map((m) => m.id))
+    : new Set(activeModIds);
+
+  const colorGrid = new Int16Array(total).fill(-1);
+  const partGrid = new Int16Array(total).fill(-1);
+  let hasParts = Array.isArray(asset?.parts) && asset.parts.length > 0;
+
+  for (let i = 0; i < baseVoxels.length; i++) {
+    const v = baseVoxels[i];
+    if (!Array.isArray(v) || v.length < 4) continue;
+    const vx = v[0];
+    const vy = v[1];
+    const vz = v[2];
+    const cIdx = v[3];
+    if (vx < 0 || vx >= W || vy < 0 || vy >= H || vz < 0 || vz >= D || cIdx < 0) continue;
+    const flat = (vy * D + vz) * W + vx;
+    colorGrid[flat] = cIdx;
+    if (v.length >= 5 && Number.isInteger(v[4])) {
+      partGrid[flat] = v[4];
+      if (v[4] >= 0) hasParts = true;
     }
   }
-  return rgbaBufferToDataUrl(outW, outH, pixels);
+
+  const appliedModIds = [];
+  for (let mIdx = 0; mIdx < mods.length; mIdx++) {
+    const mod = mods[mIdx];
+    if (!activeSet.has(mod.id)) continue;
+    appliedModIds.push(mod.id);
+
+    let dx = 0;
+    let dy = 0;
+    let dz = 0;
+    if (mod.offsetWhen && typeof mod.offsetWhen === 'object') {
+      for (const [otherId, off] of Object.entries(mod.offsetWhen)) {
+        if (activeSet.has(otherId) && Array.isArray(off)) {
+          dx += Number(off[0]) || 0;
+          dy += Number(off[1]) || 0;
+          dz += Number(off[2]) || 0;
+        }
+      }
+    }
+
+    const removeList = Array.isArray(mod.remove) ? mod.remove : [];
+    for (let i = 0; i < removeList.length; i++) {
+      const r = removeList[i];
+      if (!Array.isArray(r) || r.length < 3) continue;
+      const nx = r[0] + dx;
+      const ny = r[1] + dy;
+      const nz = r[2] + dz;
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H || nz < 0 || nz >= D) continue;
+      const flat = (ny * D + nz) * W + nx;
+      colorGrid[flat] = -1;
+      partGrid[flat] = -1;
+    }
+
+    const addList = Array.isArray(mod.add) ? mod.add : [];
+    for (let i = 0; i < addList.length; i++) {
+      const a = addList[i];
+      if (!Array.isArray(a) || a.length < 4) continue;
+      const nx = a[0] + dx;
+      const ny = a[1] + dy;
+      const nz = a[2] + dz;
+      const cIdx = a[3];
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H || nz < 0 || nz >= D || cIdx < 0) continue;
+      const flat = (ny * D + nz) * W + nx;
+      colorGrid[flat] = cIdx;
+      if (a.length >= 5 && Number.isInteger(a[4])) {
+        partGrid[flat] = a[4];
+        if (a[4] >= 0) hasParts = true;
+      } else {
+        partGrid[flat] = -1;
+      }
+    }
+  }
+
+  const voxels = [];
+  for (let y = 0; y < H; y++) {
+    for (let z = 0; z < D; z++) {
+      const rowBase = (y * D + z) * W;
+      for (let x = 0; x < W; x++) {
+        const flat = rowBase + x;
+        const c = colorGrid[flat];
+        if (c >= 0) {
+          if (hasParts) {
+            voxels.push([x, y, z, c, partGrid[flat]]);
+          } else {
+            voxels.push([x, y, z, c]);
+          }
+        }
+      }
+    }
+  }
+
+  const synthStrips = buildStripBuffersFromVoxels(size, paletteRgb, voxels);
+  return {
+    voxels,
+    activeModIds: appliedModIds,
+    strips: {
+      y: { ...synthStrips.y, image: null },
+      z: { ...synthStrips.z, image: null },
+      x: { ...synthStrips.x, image: null },
+    },
+  };
 }
 
 /**
  * assets/model.json が未生成の開発初期段階のみ使用する最小フォールバック。
- * 404画像リクエストによるコンソールエラーを避けるため、参照画像・ストリップ画像もDataURLで自己完結させる。
+ * 404画像リクエストによるコンソールエラーを避けるため、ストリップ画像もDataURLで自己完結させる。
  */
 export function buildFallbackAsset() {
   const W = 40;
@@ -175,18 +277,21 @@ export function buildFallbackAsset() {
 
   const size = { x: W, y: H, z: D };
   const strips = buildStripBuffersFromVoxels(size, paletteRgb, voxels);
-  const frontUrl = renderOrthoProjectionDataUrl(size, paletteRgb, voxels, 'front');
-  const sideUrl = renderOrthoProjectionDataUrl(size, paletteRgb, voxels, 'side');
 
   return {
     isFallback: true,
     characterId: 'char2',
-    versionId: 'v4',
+    versionId: 'v5',
     name: 'Character 2 (Placeholder)',
     size,
     palette,
     paletteRgb,
+    basePalette: [...palette],
+    basePaletteRgb: paletteRgb,
     parts: null,
+    baseVoxels: voxels,
+    mods: [],
+    activeModIds: [],
     voxels,
     strips,
     stripUrls: {
@@ -194,10 +299,6 @@ export function buildFallbackAsset() {
       z: rgbaBufferToDataUrl(strips.z.width, strips.z.height, strips.z.data),
       x: rgbaBufferToDataUrl(strips.x.width, strips.x.height, strips.x.data),
     },
-    refViews: [
-      { key: 'front', title: 'FRONT', buttonLabel: '正面', preset: 'front', url: frontUrl },
-      { key: 'side', title: 'SIDE', buttonLabel: '真横', preset: 'side', url: sideUrl },
-    ],
   };
 }
 
@@ -230,9 +331,9 @@ function resolveVersionBaseDir(entry) {
 
 function normalizeVersionItem(item) {
   return {
-    id: String(item.id || item.version || 'v1'),
-    label: String(item.shortLabel || item.label || item.id || 'v1'),
-    fullLabel: String(item.label || item.shortLabel || item.id || 'v1'),
+    id: String(item.id || item.version || 'v5'),
+    label: String(item.shortLabel || item.label || item.id || 'v5'),
+    fullLabel: String(item.label || item.shortLabel || item.id || 'v5'),
     description: String(item.description || item.title || item.label || ''),
     baseDir: resolveVersionBaseDir(item),
   };
@@ -244,10 +345,10 @@ export async function loadVersionManifest() {
     label: 'CHARACTER 2',
     shortLabel: 'CHARACTER 2',
     description: 'プラチナブロンド・縦ロールのキャラクター',
-    defaultVersion: 'v4',
+    defaultVersion: 'v5',
     refBaseDir: './assets',
     versions: [
-      { id: 'v4', label: 'v4 最新', fullLabel: 'v4 最新', description: '最新ビルド', baseDir: './assets' },
+      { id: 'v5', label: 'v5 最新', fullLabel: 'v5 最新', description: '最新ビルド', baseDir: './assets' },
     ],
   };
 
@@ -308,17 +409,10 @@ export async function loadVersionManifest() {
   }
 }
 
-const REF_VIEW_META = {
-  front: { title: 'FRONT', buttonLabel: '正面', preset: 'front' },
-  side: { title: 'SIDE', buttonLabel: '真横', preset: 'side' },
-  back: { title: 'BACK', buttonLabel: '背面', preset: 'back' },
-};
-
 export async function loadCharacterAsset(versionEntry = null, characterEntry = null) {
   const baseDir = versionEntry?.baseDir || './assets';
-  const versionId = versionEntry?.id || 'v4';
+  const versionId = versionEntry?.id || 'v5';
   const characterId = characterEntry?.id || 'char2';
-  const refBaseDir = characterEntry?.refBaseDir || baseDir;
 
   try {
     const res = await fetch(`${baseDir}/model.json`, { cache: 'no-store' });
@@ -331,29 +425,47 @@ export async function loadCharacterAsset(versionEntry = null, characterEntry = n
     const palette = model.palette || [];
     const paletteRgb = palette.map(hexToRgbBytes);
     const parts = Array.isArray(model.parts) && model.parts.length > 0 ? model.parts : null;
-    const voxels = model.voxels || [];
+    const baseVoxels = model.voxels || [];
+    const mods = normalizeModsList(model.mods);
 
     const yFile = `${baseDir}/${model.slices?.y?.file || 'slices_y.png'}`;
     const zFile = `${baseDir}/${model.slices?.z?.file || 'slices_z.png'}`;
     const xFile = `${baseDir}/${model.slices?.x?.file || 'slices_x.png'}`;
 
-    // 過去バージョンの model.json が "../../ref_front.png" のような相対パスを持つ場合でも二重遡上で404にならないようファイル名のみ抽出し、キャラ固有ディレクトリへ解決する
-    const rawRefs = model.referenceViews || { front: 'ref_front.png', side: 'ref_side.png' };
-    const refKeys = Object.keys(rawRefs).filter((k) => REF_VIEW_META[k] && rawRefs[k]);
-    const refViews = (refKeys.length > 0 ? refKeys : ['front', 'side']).slice(0, 2).map((k) => {
-      const meta = REF_VIEW_META[k];
-      const fileName = String(rawRefs[k] || `ref_${k}.png`).split('/').pop();
+    const baseAssetMeta = {
+      size,
+      palette,
+      paletteRgb,
+      basePalette: [...palette],
+      basePaletteRgb: paletteRgb,
+      parts,
+      baseVoxels,
+      mods,
+    };
+
+    if (mods.length > 0) {
+      const defaultActiveIds = mods.filter((m) => m.defaultEnabled).map((m) => m.id);
+      const composed = composeAssetVoxels(baseAssetMeta, defaultActiveIds);
       return {
-        key: k,
-        title: meta.title,
-        buttonLabel: meta.buttonLabel,
-        preset: meta.preset,
-        url: `${refBaseDir}/${fileName}`,
+        isFallback: false,
+        characterId,
+        versionId,
+        name: model.name || characterEntry?.label || 'Character 2',
+        ...baseAssetMeta,
+        voxels: composed.voxels,
+        activeModIds: composed.activeModIds,
+        referenceViews: model.referenceViews || null,
+        strips: composed.strips,
+        stripUrls: {
+          y: yFile,
+          z: zFile,
+          x: xFile,
+        },
       };
-    });
+    }
 
     // ネットワーク・キャッシュ不整合があっても即座に描画できるよう PNG 実画像とボクセル合成バッファの両方を用意する
-    const synthStrips = buildStripBuffersFromVoxels(size, paletteRgb, voxels);
+    const synthStrips = buildStripBuffersFromVoxels(size, paletteRgb, baseVoxels);
     const [imgY, imgZ, imgX] = await Promise.all([
       loadImage(yFile).catch(() => null),
       loadImage(zFile).catch(() => null),
@@ -365,11 +477,9 @@ export async function loadCharacterAsset(versionEntry = null, characterEntry = n
       characterId,
       versionId,
       name: model.name || characterEntry?.label || 'Character 2',
-      size,
-      palette,
-      paletteRgb,
-      parts,
-      voxels,
+      ...baseAssetMeta,
+      voxels: baseVoxels,
+      activeModIds: [],
       referenceViews: model.referenceViews || null,
       strips: {
         y: {
@@ -399,7 +509,6 @@ export async function loadCharacterAsset(versionEntry = null, characterEntry = n
         z: imgZ ? zFile : rgbaBufferToDataUrl(synthStrips.z.width, synthStrips.z.height, synthStrips.z.data),
         x: imgX ? xFile : rgbaBufferToDataUrl(synthStrips.x.width, synthStrips.x.height, synthStrips.x.data),
       },
-      refViews,
     };
   } catch {
     return buildFallbackAsset();

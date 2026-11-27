@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-ui-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -7,6 +7,14 @@
   <meta name="description" content="3軸積層スプライト＆3Dボクセルで全角度から鑑賞・塗り直しできるドット絵立体ビューア">
   <!-- ローカルHTTPサーバ実行時に /favicon.ico の404ネットワークエラーを出さないためインラインSVGを採用 -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231e2028'/%3E%3Crect x='8' y='6' width='16' height='14' fill='%23f3eee4'/%3E%3Crect x='10' y='20' width='12' height='7' fill='%23ffffff'/%3E%3Crect x='11' y='13' width='3' height='2' fill='%238d84a8'/%3E%3Crect x='18' y='13' width='3' height='2' fill='%238d84a8'/%3E%3C/svg%3E">
+  <script>
+    try {
+      var savedTheme = localStorage.getItem('char2_viewer_ui_theme_v1');
+      if (savedTheme === 'cream' || savedTheme === 'dark') {
+        document.documentElement.dataset.uiTheme = savedTheme;
+      }
+    } catch (e) {}
+  </script>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -20,7 +28,7 @@
         </div>
         <div class="brand-titles">
           <h1 id="brand-title">CHARACTER 2 <span>立体ドット絵ビューア</span></h1>
-          <p class="brand-sub">3軸積層スプライト &amp; ボクセル全角度検証スタジオ</p>
+          <p class="brand-sub">3軸積層スプライト &amp; 3Dボクセル全角度ビューア</p>
         </div>
         <span id="asset-status-badge" class="status-pill" data-state="loading">読込中...</span>
         <div id="topbar-char-host" class="slot-host">
@@ -28,7 +36,7 @@
             <span class="group-caption">キャラ</span>
           </div>
         </div>
-        <div id="topbar-version-host" class="slot-host">
+        <div id="topbar-version-host" class="slot-host" hidden>
           <div id="version-switcher" class="segmented-group version-switcher" role="group" aria-label="バージョン比較">
             <span class="group-caption">版比較</span>
           </div>
@@ -36,6 +44,14 @@
       </div>
 
       <div class="topbar-actions">
+        <div id="topbar-theme-host" class="slot-host">
+          <div id="ui-theme-switcher" class="segmented-group ui-theme-switcher" role="group" aria-label="UIテーマ切替">
+            <span class="group-caption">UI</span>
+            <button type="button" class="seg-btn ui-theme-btn is-active" data-ui-theme-btn="dark" aria-pressed="true">ダーク</button>
+            <button type="button" class="seg-btn ui-theme-btn" data-ui-theme-btn="cream" aria-pressed="false">クリーム</button>
+          </div>
+        </div>
+
         <div id="topbar-bg-host" class="slot-host">
           <div id="bg-switcher" class="segmented-group" role="group" aria-label="背景切替">
             <span class="group-caption">背景</span>
@@ -51,7 +67,7 @@
             台座: OFF
           </button>
 
-          <button type="button" id="open-strip-modal" class="ghost-btn">
+          <button type="button" id="open-strip-modal" class="ghost-btn" hidden>
             スライス原画
           </button>
         </div>
@@ -67,7 +83,7 @@
         <section id="slot-render" class="panel-section">
           <div class="section-header">
             <h2>描画モード</h2>
-            <span class="section-tag">3方式比較</span>
+            <span class="section-tag">2方式切替</span>
           </div>
 
           <div class="mode-cards" role="radiogroup" aria-label="レンダリングモード選択">
@@ -80,26 +96,9 @@
               <div class="mode-desc">視線ベクトルから X / Y / Z スライスを自動選択し2DスラブDDAで連続描画。</div>
             </button>
 
-            <button type="button" class="mode-card" data-mode="classic-y" role="radio" aria-checked="false">
-              <div class="mode-card-head">
-                <span class="mode-index">MODE 2</span>
-                <span class="mode-badge">比較用</span>
-              </div>
-              <div class="mode-title">従来型・1軸積層スプライト</div>
-              <div class="mode-desc">上下スライス（slices_y.png）のみを使用。水平アングルとの見え方を比較。</div>
-            </button>
-
-            <div id="classic-subcontrols" class="mode-subbox" hidden>
-              <div class="subbox-row">
-                <span class="subbox-label">厚み押し出し補完 (Extrusion)</span>
-                <button type="button" id="toggle-classic-extrude" class="toggle-chip" aria-pressed="false">OFF</button>
-              </div>
-              <p class="subbox-note">OFFは従来薄板積層、ONでYスライス厚みを補完します。</p>
-            </div>
-
             <button type="button" class="mode-card" data-mode="voxel" role="radio" aria-checked="false">
               <div class="mode-card-head">
-                <span class="mode-index">MODE 3</span>
+                <span class="mode-index">MODE 2</span>
                 <span class="mode-badge">3Dメッシュ</span>
               </div>
               <div class="mode-title">3Dピクセル・ボクセル</div>
@@ -109,7 +108,7 @@
             <div id="voxel-subcontrols" class="mode-subbox" hidden>
               <div class="slider-block compact">
                 <div class="slider-header">
-                  <label for="slider-shading">立体陰影 (Shading)</label>
+                  <label for="slider-shading">影のつよさ</label>
                   <output id="val-shading" for="slider-shading">35%</output>
                 </div>
                 <input type="range" id="slider-shading" min="0" max="100" step="1" value="35">
@@ -134,12 +133,12 @@
                 <input type="range" id="slider-outline-width" min="0.50" max="3.50" step="0.25" value="1.50">
               </div>
               <div class="snap-header-row">
-                <span class="subbox-label">ドット角スナップ (Pixel Snap)</span>
+                <span class="subbox-label">ピクセル化 (Pixel Snap)</span>
               </div>
-              <div class="segmented-group full-width-seg snap-grid-4" role="group" aria-label="ドット角スナップ解像度">
-                <button type="button" class="seg-btn snap-mode-btn is-active" data-snap="0">OFF</button>
+              <div class="segmented-group full-width-seg snap-grid-4" role="group" aria-label="ピクセル化解像度">
+                <button type="button" class="seg-btn snap-mode-btn" data-snap="0">OFF</button>
                 <button type="button" class="seg-btn snap-mode-btn" data-snap="3">3x</button>
-                <button type="button" class="seg-btn snap-mode-btn" data-snap="2">2x</button>
+                <button type="button" class="seg-btn snap-mode-btn is-active" data-snap="2">2x</button>
                 <button type="button" class="seg-btn snap-mode-btn" data-snap="1">1x</button>
               </div>
             </div>
@@ -211,7 +210,7 @@
               <span id="hud-axis-text">ACTIVE: Z-Stack (前後スライス)</span>
             </div>
             <div id="hud-outline-pill" class="extra-pill">2D Outline 1.50</div>
-            <div id="hud-extra-pill" class="extra-pill" hidden>Pixel Snap 2x</div>
+            <div id="hud-extra-pill" class="extra-pill">Pixel Snap 2x</div>
             <div id="hud-paint-pill" class="extra-pill paint-pill" hidden>塗り直しモード ON</div>
           </div>
 
@@ -254,6 +253,8 @@
             </div>
           </div>
 
+          <div id="floating-options-bar" class="floating-options-bar" role="group" aria-label="クイックオプション切替" hidden></div>
+
           <div id="floating-dock" class="floating-dock" role="toolbar" aria-label="クイック操作">
             <button type="button" id="floating-autospin" class="m3-pill-btn" aria-pressed="false">
               自動回転: OFF
@@ -282,37 +283,14 @@
         </div>
       </main>
 
-      <aside id="ref-panel" class="ref-sidebar" aria-label="元絵比較とカラー編集">
-        <div id="slot-reference" class="ref-slot">
-          <div class="ref-header">
-            <div>
-              <h2>元絵比較 (Reference)</h2>
-              <p id="ref-sub-label" class="ref-sub">CHARACTER 2 抽出原画</p>
-            </div>
+      <aside id="ref-panel" class="ref-sidebar" aria-label="オプションとカラー編集">
+        <section id="slot-mods" class="mods-box" aria-label="オプション切替" hidden>
+          <div class="mods-head-row">
+            <h2>オプション</h2>
+            <span id="mods-count-badge" class="section-tag">0 / 0 ON</span>
           </div>
-
-          <div class="ref-cards-grid">
-            <div class="ref-card">
-              <div class="ref-card-bar">
-                <span id="ref-card1-title" class="ref-card-title">FRONT</span>
-                <button type="button" id="ref-card1-btn" class="mini-snap-btn" data-preset="front">正面</button>
-              </div>
-              <div class="ref-img-frame" data-bg="dark">
-                <img id="ref-front-img" alt="正面リファレンス原画">
-              </div>
-            </div>
-
-            <div class="ref-card">
-              <div class="ref-card-bar">
-                <span id="ref-card2-title" class="ref-card-title">SIDE</span>
-                <button type="button" id="ref-card2-btn" class="mini-snap-btn" data-preset="side">真横</button>
-              </div>
-              <div class="ref-img-frame" data-bg="dark">
-                <img id="ref-side-img" alt="側面または背面リファレンス原画">
-              </div>
-            </div>
-          </div>
-        </div>
+          <div id="mods-chip-bar" class="mods-chip-bar" role="group" aria-label="モデルオプション切替"></div>
+        </section>
 
         <section id="slot-paint" class="paint-box" aria-label="カラー編集・塗り直しツール">
           <div class="paint-head-row">
@@ -344,10 +322,10 @@
               <div class="iro-col-preview">
                 <div id="paint-color-swatch" class="color-preview-square" style="background-color: #F48FB1;" title="現在の塗り色"></div>
                 <input type="text" id="paint-hex-input" class="iro-hex-input" value="#F48FB1" maxlength="7" spellcheck="false" autocomplete="off" aria-label="16進カラーコード">
+                <button type="button" id="toggle-eyedropper" class="ghost-btn eyedropper-mini-btn" aria-pressed="false" title="クリックまたはShift+クリックでモデルから色を抽出">スポイト</button>
               </div>
               <div id="iro-wheel-mount" class="iro-mount iro-wheel-mount" aria-label="iro.js カラーホイール"></div>
               <div class="iro-col-right">
-                <button type="button" id="toggle-eyedropper" class="ghost-btn eyedropper-mini-btn" aria-pressed="false" title="クリックまたはShift+クリックでモデルから色を抽出">スポイト</button>
                 <div id="iro-sliders-mount" class="iro-mount iro-sliders-mount" aria-label="iro.js 彩度・明度スライダー"></div>
               </div>
             </div>
@@ -382,7 +360,7 @@
     </div>
   </div>
 
-  <div id="m3-sheet-overlay" class="m3-sheet-overlay" role="dialog" aria-modal="true" aria-label="ビューア設定メニュー" hidden>
+  <div id="m3-sheet-overlay" class="m3-sheet-overlay" role="dialog" aria-modal="false" aria-label="ビューア設定メニュー" hidden>
     <div id="m3-sheet-scrim" class="m3-sheet-scrim"></div>
     <div id="m3-sheet-surface" class="m3-sheet-surface">
       <div id="m3-sheet-handle-zone" class="m3-sheet-handle-zone">
@@ -391,30 +369,31 @@
 
       <div class="m3-sheet-header">
         <div class="m3-sheet-title-wrap">
-          <h2 class="m3-sheet-title">CHARACTER 2 設定</h2>
+          <h2 id="m3-sheet-title" class="m3-sheet-title">CHARACTER 2 設定</h2>
         </div>
         <button type="button" id="m3-sheet-close" class="m3-close-btn" aria-label="メニューを閉じる">閉じる</button>
       </div>
 
       <div class="m3-tabs" role="tablist" aria-label="メニュータブ">
-        <button type="button" class="m3-tab is-active" role="tab" aria-selected="true" data-sheet-tab="display">表示・描画</button>
-        <button type="button" class="m3-tab" role="tab" aria-selected="false" data-sheet-tab="compare">比較・元絵</button>
+        <button type="button" class="m3-tab is-active" role="tab" aria-selected="true" data-sheet-tab="display">表示・オプション</button>
+        <button type="button" class="m3-tab" role="tab" aria-selected="false" data-sheet-tab="camera">カメラ・断面</button>
         <button type="button" class="m3-tab" role="tab" aria-selected="false" data-sheet-tab="paint">塗り直し</button>
       </div>
 
       <div class="m3-sheet-body">
         <div id="m3-tab-display" class="m3-tab-panel is-active">
+          <div id="mobile-char-host" class="mobile-host-block"></div>
+          <div id="mobile-version-host" class="mobile-host-block" hidden></div>
+          <div id="mobile-mods-host" class="mobile-host-stack"></div>
+          <div id="mobile-theme-host" class="mobile-host-block"></div>
           <div id="mobile-bg-host" class="mobile-host-block"></div>
           <div id="mobile-util-host" class="mobile-host-row"></div>
           <div id="mobile-render-host" class="mobile-host-stack"></div>
-          <div id="mobile-camera-host" class="mobile-host-stack"></div>
-          <div id="mobile-inspect-host" class="mobile-host-stack"></div>
         </div>
 
-        <div id="m3-tab-compare" class="m3-tab-panel" hidden>
-          <div id="mobile-char-host" class="mobile-host-block"></div>
-          <div id="mobile-version-host" class="mobile-host-block"></div>
-          <div id="mobile-reference-host" class="mobile-host-stack"></div>
+        <div id="m3-tab-camera" class="m3-tab-panel" hidden>
+          <div id="mobile-camera-host" class="mobile-host-stack"></div>
+          <div id="mobile-inspect-host" class="mobile-host-stack"></div>
         </div>
 
         <div id="m3-tab-paint" class="m3-tab-panel" hidden>

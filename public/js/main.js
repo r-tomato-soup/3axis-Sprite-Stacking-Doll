@@ -1,5 +1,10 @@
 import { CAMERA_PRESETS, OrbitCamera } from './camera.js';
-import { loadCharacterAsset, loadVersionManifest, rgbaBufferToDataUrl } from './loader.js';
+import {
+  composeAssetVoxels,
+  loadCharacterAsset,
+  loadVersionManifest,
+  rgbaBufferToDataUrl,
+} from './loader.js';
 import { normalizeHex, VoxelPainter } from './painter.js';
 import {
   buildCategoriesForAsset,
@@ -13,21 +18,42 @@ import {
 } from './palettes.js';
 import { Pseudo3DRenderer } from './renderer.js';
 
+const UI_THEME_STORAGE_KEY = 'char2_viewer_ui_theme_v1';
+const isDevMode = new URLSearchParams(window.location.search).get('dev') === '1';
+
+function loadSavedUiTheme() {
+  try {
+    const raw = localStorage.getItem(UI_THEME_STORAGE_KEY);
+    return raw === 'cream' ? 'cream' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+function persistUiTheme(theme) {
+  try {
+    localStorage.setItem(UI_THEME_STORAGE_KEY, theme);
+  } catch {
+    // ストレージ無効環境でもUI切替自体は継続する
+  }
+}
+
 const state = {
   mode: 'tri',
-  classicExtrude: false,
   shading: 35,
   outline: true,
   outlineWidth: 1.5,
-  pixelSnapSubdiv: 0,
+  pixelSnapSubdiv: 2,
   explode: 1.0,
   cutaway: 0,
   cutAxis: 'auto',
   bg: 'dark',
+  uiTheme: loadSavedUiTheme(),
   showGrid: false,
   stripZoom: 2,
   characterId: 'char2',
-  versionId: 'v4',
+  versionId: 'v5',
+  activeModIds: [],
   paintMode: false,
   paintScope: 'part',
   paintConnected: true,
@@ -48,6 +74,7 @@ const dom = {
   statusBadge: document.getElementById('asset-status-badge'),
   characterSwitcher: document.getElementById('character-switcher'),
   versionSwitcher: document.getElementById('version-switcher'),
+  uiThemeSwitcher: document.getElementById('ui-theme-switcher'),
   bgSwitcher: document.getElementById('bg-switcher'),
   workspaceGrid: document.getElementById('workspace-grid'),
   leftSidebar: document.getElementById('left-sidebar'),
@@ -58,23 +85,27 @@ const dom = {
 
   topbarCharHost: document.getElementById('topbar-char-host'),
   topbarVersionHost: document.getElementById('topbar-version-host'),
+  topbarThemeHost: document.getElementById('topbar-theme-host'),
   topbarBgHost: document.getElementById('topbar-bg-host'),
   topbarUtilHost: document.getElementById('topbar-util-host'),
 
   slotRender: document.getElementById('slot-render'),
   slotCamera: document.getElementById('slot-camera'),
   slotInspect: document.getElementById('slot-inspect'),
-  slotReference: document.getElementById('slot-reference'),
+  slotMods: document.getElementById('slot-mods'),
+  modsCountBadge: document.getElementById('mods-count-badge'),
+  modsChipBar: document.getElementById('mods-chip-bar'),
   slotPaint: document.getElementById('slot-paint'),
 
+  mobileCharHost: document.getElementById('mobile-char-host'),
+  mobileVersionHost: document.getElementById('mobile-version-host'),
+  mobileModsHost: document.getElementById('mobile-mods-host'),
+  mobileThemeHost: document.getElementById('mobile-theme-host'),
   mobileBgHost: document.getElementById('mobile-bg-host'),
   mobileUtilHost: document.getElementById('mobile-util-host'),
   mobileRenderHost: document.getElementById('mobile-render-host'),
   mobileCameraHost: document.getElementById('mobile-camera-host'),
   mobileInspectHost: document.getElementById('mobile-inspect-host'),
-  mobileCharHost: document.getElementById('mobile-char-host'),
-  mobileVersionHost: document.getElementById('mobile-version-host'),
-  mobileReferenceHost: document.getElementById('mobile-reference-host'),
   mobilePaintHost: document.getElementById('mobile-paint-host'),
 
   hudAxisPill: document.getElementById('hud-axis-pill'),
@@ -89,9 +120,7 @@ const dom = {
   hudSlices: document.getElementById('hud-slices'),
   hudVolume: document.getElementById('hud-volume'),
 
-  classicSub: document.getElementById('classic-subcontrols'),
   voxelSub: document.getElementById('voxel-subcontrols'),
-  toggleClassicExtrude: document.getElementById('toggle-classic-extrude'),
   toggleOutline: document.getElementById('toggle-outline'),
   sliderOutlineWidth: document.getElementById('slider-outline-width'),
   valOutlineWidth: document.getElementById('val-outline-width'),
@@ -110,6 +139,7 @@ const dom = {
 
   toggleGrid: document.getElementById('toggle-grid'),
   btnCollapseAll: document.getElementById('btn-collapse-all'),
+  floatingOptionsBar: document.getElementById('floating-options-bar'),
   floatingAutoSpin: document.getElementById('floating-autospin'),
   floatingColorFab: document.getElementById('floating-color-fab'),
   floatingOpenMenu: document.getElementById('floating-open-menu'),
@@ -124,18 +154,11 @@ const dom = {
   m3SheetScrim: document.getElementById('m3-sheet-scrim'),
   m3SheetSurface: document.getElementById('m3-sheet-surface'),
   m3SheetHandleZone: document.getElementById('m3-sheet-handle-zone'),
+  m3SheetTitle: document.getElementById('m3-sheet-title'),
   m3SheetClose: document.getElementById('m3-sheet-close'),
   m3TabDisplay: document.getElementById('m3-tab-display'),
-  m3TabCompare: document.getElementById('m3-tab-compare'),
+  m3TabCamera: document.getElementById('m3-tab-camera'),
   m3TabPaint: document.getElementById('m3-tab-paint'),
-
-  refSubLabel: document.getElementById('ref-sub-label'),
-  refCard1Title: document.getElementById('ref-card1-title'),
-  refCard1Btn: document.getElementById('ref-card1-btn'),
-  refCard2Title: document.getElementById('ref-card2-title'),
-  refCard2Btn: document.getElementById('ref-card2-btn'),
-  refFrontImg: document.getElementById('ref-front-img'),
-  refSideImg: document.getElementById('ref-side-img'),
 
   togglePaintMode: document.getElementById('toggle-paint-mode'),
   paintScopePart: document.getElementById('paint-scope-part'),
@@ -185,6 +208,7 @@ const dom = {
 const mobileMediaQuery = window.matchMedia('(max-width: 900px)');
 
 let needsRender = true;
+let loadedAsset = null;
 let currentAsset = null;
 let manifestData = { defaultCharacterId: 'char2', characters: [] };
 let customColors = loadCustomColors();
@@ -195,6 +219,7 @@ let iroSliders = null;
 let isSyncingIro = false;
 let stripModalNeedsRefresh = false;
 let toastTimer = null;
+let viewportTransitionRaf = 0;
 
 const painter = new VoxelPainter();
 const renderer = new Pseudo3DRenderer(dom.canvas);
@@ -226,6 +251,41 @@ function showPaintToast(message) {
   toastTimer = setTimeout(() => {
     dom.paintToast.hidden = true;
   }, 2400);
+}
+
+function pumpViewportResize(durationMs = 280) {
+  if (viewportTransitionRaf) cancelAnimationFrame(viewportTransitionRaf);
+  const start = performance.now();
+  const step = (now) => {
+    renderNow();
+    if (now - start < durationMs) {
+      viewportTransitionRaf = requestAnimationFrame(step);
+    } else {
+      viewportTransitionRaf = 0;
+    }
+  };
+  viewportTransitionRaf = requestAnimationFrame(step);
+}
+
+function setUiTheme(theme) {
+  const resolved = theme === 'cream' ? 'cream' : 'dark';
+  state.uiTheme = resolved;
+  document.documentElement.dataset.uiTheme = resolved;
+  persistUiTheme(resolved);
+  document.querySelectorAll('.ui-theme-btn').forEach((btn) => {
+    const active = btn.dataset.uiThemeBtn === resolved;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  renderNow();
+}
+
+function syncVersionSwitcherVisibility() {
+  const ch = getActiveCharacter();
+  const versions = ch?.versions || [];
+  const showVersions = isDevMode && versions.length > 1;
+  dom.topbarVersionHost.hidden = !showVersions;
+  dom.mobileVersionHost.hidden = !showVersions;
 }
 
 function drawAxisGizmo(basis) {
@@ -294,12 +354,9 @@ function updateHud(renderInfo) {
   if (state.mode === 'tri') {
     dom.hudAxisPill.dataset.axis = renderInfo.activeAxis;
     dom.hudAxisText.textContent = `ACTIVE: ${axisNames[renderInfo.activeAxis]}`;
-  } else if (state.mode === 'classic-y') {
-    dom.hudAxisPill.dataset.axis = 'y';
-    dom.hudAxisText.textContent = `LOCKED: Y-Stack (${state.classicExtrude ? '厚み補完 ON' : '従来1枚板 OFF'})`;
   } else {
     dom.hudAxisPill.dataset.axis = 'voxel';
-    dom.hudAxisText.textContent = `VOXEL MESH (陰影 ${state.shading}%)`;
+    dom.hudAxisText.textContent = `VOXEL MESH (影のつよさ ${state.shading}%)`;
   }
 
   dom.hudOutlinePill.hidden = !state.outline;
@@ -382,20 +439,24 @@ function setPanelsCollapsed(collapsed) {
 }
 
 function setMobileSheetTab(tabKey) {
-  state.mobileSheetTab = tabKey;
+  const resolved = ['display', 'camera', 'paint'].includes(tabKey) ? tabKey : 'display';
+  state.mobileSheetTab = resolved;
   document.querySelectorAll('.m3-tab').forEach((tab) => {
-    const active = tab.dataset.sheetTab === tabKey;
+    const active = tab.dataset.sheetTab === resolved;
     tab.classList.toggle('is-active', active);
     tab.setAttribute('aria-selected', String(active));
   });
-  dom.m3TabDisplay.hidden = tabKey !== 'display';
-  dom.m3TabCompare.hidden = tabKey !== 'compare';
-  dom.m3TabPaint.hidden = tabKey !== 'paint';
+  dom.m3TabDisplay.hidden = resolved !== 'display';
+  dom.m3TabCamera.hidden = resolved !== 'camera';
+  dom.m3TabPaint.hidden = resolved !== 'paint';
 }
 
 function setMobileSheetOpen(open) {
-  state.mobileSheetOpen = Boolean(open);
-  if (state.mobileSheetOpen) {
+  const nextOpen = Boolean(open) && mobileMediaQuery.matches;
+  state.mobileSheetOpen = nextOpen;
+  document.body.classList.toggle('mobile-sheet-open', nextOpen);
+
+  if (nextOpen) {
     dom.m3SheetOverlay.hidden = false;
     dom.m3SheetSurface.style.transform = '';
     // hidden解除と同一フレームでクラスを付けるとCSSトランジションが走らないため1フレーム遅らせる
@@ -411,6 +472,9 @@ function setMobileSheetOpen(open) {
       }
     }, 240);
   }
+
+  // モバイルボトムシート開閉に伴うステージ高さ変化の間も連続リサイズ描画してキャラを常時綺麗にフレーミングする
+  pumpViewportResize(280);
 }
 
 /**
@@ -423,47 +487,51 @@ function syncResponsiveLayout() {
     if (state.miniPaletteOpen) {
       setMiniPaletteOpen(false);
     }
+    dom.mobileCharHost.appendChild(dom.characterSwitcher);
+    dom.mobileVersionHost.appendChild(dom.versionSwitcher);
+    dom.mobileModsHost.appendChild(dom.slotMods);
+    dom.mobileThemeHost.appendChild(dom.uiThemeSwitcher);
     dom.mobileBgHost.appendChild(dom.bgSwitcher);
     dom.mobileUtilHost.appendChild(dom.toggleGrid);
     dom.mobileUtilHost.appendChild(dom.openStripModal);
     dom.mobileRenderHost.appendChild(dom.slotRender);
     dom.mobileCameraHost.appendChild(dom.slotCamera);
     dom.mobileInspectHost.appendChild(dom.slotInspect);
-    dom.mobileCharHost.appendChild(dom.characterSwitcher);
-    dom.mobileVersionHost.appendChild(dom.versionSwitcher);
-    dom.mobileReferenceHost.appendChild(dom.slotReference);
     dom.mobilePaintHost.appendChild(dom.slotPaint);
     dom.floatingOpenMenu.textContent = 'メニュー';
   } else {
     dom.topbarCharHost.appendChild(dom.characterSwitcher);
     dom.topbarVersionHost.appendChild(dom.versionSwitcher);
+    dom.topbarThemeHost.appendChild(dom.uiThemeSwitcher);
     dom.topbarBgHost.appendChild(dom.bgSwitcher);
     dom.topbarUtilHost.appendChild(dom.toggleGrid);
     dom.topbarUtilHost.appendChild(dom.openStripModal);
     dom.leftSidebar.appendChild(dom.slotRender);
     dom.leftSidebar.appendChild(dom.slotCamera);
     dom.leftSidebar.appendChild(dom.slotInspect);
-    dom.refPanel.appendChild(dom.slotReference);
+    dom.refPanel.appendChild(dom.slotMods);
     dom.refPanel.appendChild(dom.slotPaint);
     if (state.mobileSheetOpen) {
       state.mobileSheetOpen = false;
+      document.body.classList.remove('mobile-sheet-open');
       dom.m3SheetOverlay.classList.remove('is-open');
       dom.m3SheetOverlay.hidden = true;
     }
     dom.floatingOpenMenu.textContent = 'メニューを開く';
   }
+  syncVersionSwitcherVisibility();
   requestAnimationFrame(() => renderNow());
 }
 
 function setMode(mode) {
-  state.mode = mode;
+  const resolved = mode === 'voxel' ? 'voxel' : 'tri';
+  state.mode = resolved;
   document.querySelectorAll('.mode-card').forEach((card) => {
-    const active = card.dataset.mode === mode;
+    const active = card.dataset.mode === resolved;
     card.classList.toggle('is-active', active);
     card.setAttribute('aria-checked', String(active));
   });
-  dom.classicSub.hidden = mode !== 'classic-y';
-  dom.voxelSub.hidden = mode !== 'voxel';
+  dom.voxelSub.hidden = resolved !== 'voxel';
   renderNow();
 }
 
@@ -493,12 +561,12 @@ function setPixelSnap(subdiv) {
 
 function initIroColorPicker() {
   if (iroPicker || !dom.iroWheelMount || !dom.iroSlidersMount || typeof window.iro === 'undefined') return;
-  // 左プレビュー・中央ホイール・右(スポイト＋彩度/明度2本縦スライダ)の3列構成で高さを圧縮しつつ全色域を無制限操作可能にする
+  // 左(プレビュー・HEX・スポイト)・中央(カラーホイール)・右(縦長・幅広の彩度/明度2本スライダ)で操作性を最大化する
   iroPicker = new window.iro.ColorPicker(dom.iroWheelMount, {
-    width: 96,
+    width: 88,
     color: state.paintColor,
     borderWidth: 1,
-    borderColor: '#43485c',
+    borderColor: '#4A4A4A',
     handleRadius: 5,
     padding: 2,
     layout: [
@@ -507,17 +575,17 @@ function initIroColorPicker() {
   });
 
   iroSliders = new window.iro.ColorPicker(dom.iroSlidersMount, {
-    width: 72,
+    width: 102,
     color: state.paintColor,
     borderWidth: 1,
-    borderColor: '#43485c',
-    handleRadius: 5,
+    borderColor: '#4A4A4A',
+    handleRadius: 7,
     padding: 2,
-    margin: 6,
+    margin: 8,
     layoutDirection: 'horizontal',
     layout: [
-      { component: window.iro.ui.Slider, options: { sliderType: 'saturation', sliderSize: 15 } },
-      { component: window.iro.ui.Slider, options: { sliderType: 'value', sliderSize: 15 } },
+      { component: window.iro.ui.Slider, options: { sliderType: 'saturation', sliderSize: 20 } },
+      { component: window.iro.ui.Slider, options: { sliderType: 'value', sliderSize: 20 } },
     ],
   });
 
@@ -569,7 +637,7 @@ function setPaintScope(scope, { silent = false } = {}) {
   dom.paintScopePart.disabled = !hasParts;
   dom.paintScopePart.title = hasParts
     ? 'クリックしたボクセルと同一パーツ全体を陰影付きで一括塗り直し'
-    : 'この版にはパーツ情報がありません（v4 / うさぎで利用可能）';
+    : 'このモデルにはパーツ情報がありません';
 
   if (resolved === 'part' && !hasParts) {
     resolved = 'connected';
@@ -738,7 +806,7 @@ function restoreColorState() {
     showPaintToast(msg);
     return false;
   }
-  applyEditedVoxelsToRenderer('保管していた配色を復元しました', { refreshCategories: true });
+  applyEditedVoxelsToRenderer('保管していた配色を復元しました');
   return true;
 }
 
@@ -920,10 +988,132 @@ function renderPaletteSwatches() {
   syncPaletteSelection();
 }
 
+function updateStatusBadge(asset) {
+  const ch = getActiveCharacter();
+  if (asset.isFallback) {
+    dom.statusBadge.dataset.state = 'fallback';
+    dom.statusBadge.textContent = 'プレースホルダー表示中 (model.json 待機)';
+    return;
+  }
+  dom.statusBadge.dataset.state = 'ready';
+  const verMeta = isDevMode ? ch?.versions?.find((v) => v.id === asset.versionId) : null;
+  const verPrefix = verMeta ? `${verMeta.id} · ` : '';
+  dom.statusBadge.textContent = `${verPrefix}${asset.name} (${asset.voxels.length.toLocaleString()} voxels)`;
+}
+
+function createOptionChipButton(mod, isOn, extraClass = '') {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `mod-chip${extraClass ? ` ${extraClass}` : ''}${isOn ? ' is-active' : ''}`;
+  btn.dataset.modId = mod.id;
+  btn.setAttribute('aria-pressed', String(isOn));
+  btn.title = `${mod.label} を${isOn ? 'OFF' : 'ON'}にする`;
+
+  const dot = document.createElement('span');
+  dot.className = 'mod-chip-dot';
+  dot.setAttribute('aria-hidden', 'true');
+
+  const label = document.createElement('span');
+  label.className = 'mod-chip-label';
+  label.textContent = mod.label;
+
+  btn.appendChild(dot);
+  btn.appendChild(label);
+  btn.addEventListener('click', () => toggleMod(mod.id));
+  return btn;
+}
+
+function renderModsBar() {
+  const mods = Array.isArray(loadedAsset?.mods) ? loadedAsset.mods : [];
+  if (mods.length === 0) {
+    dom.slotMods.hidden = true;
+    dom.modsChipBar.innerHTML = '';
+    if (dom.floatingOptionsBar) {
+      dom.floatingOptionsBar.hidden = true;
+      dom.floatingOptionsBar.innerHTML = '';
+    }
+    return;
+  }
+
+  dom.slotMods.hidden = false;
+  const activeSet = new Set(state.activeModIds);
+  const activeCount = mods.filter((m) => activeSet.has(m.id)).length;
+  dom.modsCountBadge.textContent = `${activeCount} / ${mods.length} ON`;
+  dom.modsChipBar.innerHTML = '';
+  if (dom.floatingOptionsBar) {
+    dom.floatingOptionsBar.hidden = false;
+    dom.floatingOptionsBar.innerHTML = '';
+  }
+
+  mods.forEach((mod) => {
+    const isOn = activeSet.has(mod.id);
+    dom.modsChipBar.appendChild(createOptionChipButton(mod, isOn));
+    if (dom.floatingOptionsBar) {
+      dom.floatingOptionsBar.appendChild(createOptionChipButton(mod, isOn, 'floating-opt-chip'));
+    }
+  });
+}
+
+function applyActiveMods(nextModIds, { feedback = null } = {}) {
+  if (!loadedAsset || !Array.isArray(loadedAsset.mods) || loadedAsset.mods.length === 0) {
+    return false;
+  }
+  const composed = composeAssetVoxels(loadedAsset, nextModIds);
+  state.activeModIds = composed.activeModIds;
+
+  const composedAsset = {
+    ...loadedAsset,
+    palette: [...loadedAsset.basePalette],
+    paletteRgb: loadedAsset.basePaletteRgb,
+    voxels: composed.voxels,
+    strips: composed.strips,
+    activeModIds: composed.activeModIds,
+    isEdited: false,
+  };
+
+  currentAsset = composedAsset;
+  painter.loadFromAsset(composedAsset);
+  renderer.setAsset(composedAsset);
+  updateStatusBadge(composedAsset);
+  setPaintScope(painter.hasParts ? state.paintScope : 'connected', { silent: true });
+  rebuildCategoriesForCurrentAsset();
+  syncUndoUi();
+  renderModsBar();
+  stripModalNeedsRefresh = true;
+  if (!dom.stripModal.hidden) {
+    refreshStripModalImages();
+  }
+  if (feedback) {
+    dom.paintFeedback.textContent = feedback;
+    showPaintToast(feedback);
+  }
+  renderNow();
+  return true;
+}
+
+function toggleMod(modId) {
+  if (!loadedAsset || !Array.isArray(loadedAsset.mods)) return false;
+  const mod = loadedAsset.mods.find((m) => m.id === modId);
+  if (!mod) return false;
+
+  const activeSet = new Set(state.activeModIds);
+  const nextOn = !activeSet.has(modId);
+  if (nextOn) {
+    activeSet.add(modId);
+  } else {
+    activeSet.delete(modId);
+  }
+  const orderedIds = loadedAsset.mods.filter((m) => activeSet.has(m.id)).map((m) => m.id);
+  return applyActiveMods(orderedIds, {
+    feedback: `オプション「${mod.label}」を ${nextOn ? 'ON' : 'OFF'} にしました`,
+  });
+}
+
 function applyEditedVoxelsToRenderer(feedbackMsg) {
   const editedAsset = painter.buildUpdatedAsset();
   currentAsset = editedAsset;
   renderer.setAsset(editedAsset);
+  updateStatusBadge(editedAsset);
   syncUndoUi();
   rebuildCategoriesForCurrentAsset();
   stripModalNeedsRefresh = true;
@@ -1066,8 +1256,9 @@ function refreshStripModalImages() {
   if (!currentAsset) return;
   stripModalNeedsRefresh = false;
 
-  // ペイント編集後はメモリ上の編集済みバッファをDataURL化してモーダルへ反映し、未編集時は実PNG URLを直接使う
-  if (currentAsset.isEdited) {
+  const hasMods = Array.isArray(currentAsset.mods) && currentAsset.mods.length > 0;
+  // ペイント編集後・モッズ合成時はメモリ上の最新バッファをDataURL化してモーダルへ反映する
+  if (currentAsset.isEdited || hasMods) {
     const sy = currentAsset.strips.y;
     const sz = currentAsset.strips.z;
     const sx = currentAsset.strips.x;
@@ -1123,31 +1314,18 @@ function renderVersionSwitcher() {
     });
     dom.versionSwitcher.appendChild(btn);
   });
-}
-
-function applyReferenceViewsUi(asset, charEntry) {
-  const views = asset.refViews || [];
-  const charLabel = charEntry?.label || asset.name || 'CHARACTER 2';
-  dom.refSubLabel.textContent = `${charLabel} 抽出原画`;
-
-  const v1 = views[0] || { title: 'FRONT', buttonLabel: '正面', preset: 'front', url: './assets/ref_front.png' };
-  const v2 = views[1] || { title: 'SIDE', buttonLabel: '真横', preset: 'side', url: './assets/ref_side.png' };
-
-  dom.refCard1Title.textContent = v1.title;
-  dom.refCard1Btn.textContent = v1.buttonLabel;
-  dom.refCard1Btn.dataset.preset = v1.preset;
-  dom.refFrontImg.src = v1.url;
-
-  dom.refCard2Title.textContent = v2.title;
-  dom.refCard2Btn.textContent = v2.buttonLabel;
-  dom.refCard2Btn.dataset.preset = v2.preset;
-  dom.refSideImg.src = v2.url;
+  syncVersionSwitcherVisibility();
 }
 
 function applyAssetToUi(asset, { preserveCamera = false } = {}) {
   const ch = getActiveCharacter();
   const hadPartsBefore = painter.hasParts;
+  loadedAsset = asset;
   currentAsset = asset;
+  state.activeModIds = Array.isArray(asset.activeModIds)
+    ? [...asset.activeModIds]
+    : (Array.isArray(asset.mods) ? asset.mods.filter((m) => m.defaultEnabled).map((m) => m.id) : []);
+
   painter.loadFromAsset(asset);
   renderer.setAsset(asset);
   if (!preserveCamera) {
@@ -1155,31 +1333,28 @@ function applyAssetToUi(asset, { preserveCamera = false } = {}) {
   }
 
   dom.hudVolume.textContent = `${asset.size.x}×${asset.size.y}×${asset.size.z}`;
-  dom.brandTitle.innerHTML = `${ch ? ch.shortLabel : asset.name} <span>立体ドット絵ビューア</span>`;
-
-  if (asset.isFallback) {
-    dom.statusBadge.dataset.state = 'fallback';
-    dom.statusBadge.textContent = 'プレースホルダー表示中 (model.json 待機)';
-  } else {
-    dom.statusBadge.dataset.state = 'ready';
-    const verMeta = ch?.versions?.find((v) => v.id === asset.versionId);
-    const verPrefix = verMeta ? `${verMeta.id} · ` : '';
-    dom.statusBadge.textContent = `${verPrefix}${asset.name} (${asset.voxels.length.toLocaleString()} voxels)`;
+  const displayName = ch ? ch.shortLabel : asset.name;
+  dom.brandTitle.innerHTML = `${displayName} <span>立体ドット絵ビューア</span>`;
+  if (dom.m3SheetTitle) {
+    dom.m3SheetTitle.textContent = `${displayName} 設定`;
   }
 
-  // パーツ付きモデルへ切り替えたときは標準スコープの「パーツ全体」を優先し、非対応の過去版では「連結同色」へ安全にフォールバックする
+  updateStatusBadge(asset);
+
   const nextScope = painter.hasParts
     ? (!hadPartsBefore || state.paintScope === 'part' ? 'part' : state.paintScope)
     : (state.paintScope === 'part' ? 'connected' : state.paintScope);
   setPaintScope(nextScope, { silent: true });
 
-  applyReferenceViewsUi(asset, ch);
+  renderModsBar();
   rebuildCategoriesForCurrentAsset({ resetToFirst: true });
   setPaintColor(state.paintColor);
   syncUndoUi();
   syncStorageUi();
   stripModalNeedsRefresh = true;
-  refreshStripModalImages();
+  if (!dom.stripModal.hidden) {
+    refreshStripModalImages();
+  }
   renderNow();
 }
 
@@ -1242,7 +1417,7 @@ function bindSheetSwipeToDismiss() {
     if (!swiping) return;
     swiping = false;
     dom.m3SheetSurface.style.transition = '';
-    if (lastDeltaY > 70) {
+    if (lastDeltaY > 64) {
       setMobileSheetOpen(false);
     } else {
       dom.m3SheetSurface.style.transform = '';
@@ -1254,6 +1429,12 @@ function bindSheetSwipeToDismiss() {
 }
 
 function bindEvents() {
+  document.querySelectorAll('.ui-theme-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setUiTheme(btn.dataset.uiThemeBtn);
+    });
+  });
+
   document.querySelectorAll('[data-bg]').forEach((btn) => {
     if (!btn.classList.contains('seg-btn')) return;
     btn.addEventListener('click', () => {
@@ -1262,22 +1443,12 @@ function bindEvents() {
         b.classList.toggle('is-active', b === btn);
       });
       dom.viewportContainer.dataset.bg = state.bg;
-      document.querySelectorAll('.ref-img-frame').forEach((frame) => {
-        frame.dataset.bg = state.bg;
-      });
       renderNow();
     });
   });
 
   document.querySelectorAll('.mode-card').forEach((card) => {
     card.addEventListener('click', () => setMode(card.dataset.mode));
-  });
-
-  dom.toggleClassicExtrude.addEventListener('click', () => {
-    state.classicExtrude = !state.classicExtrude;
-    dom.toggleClassicExtrude.setAttribute('aria-pressed', String(state.classicExtrude));
-    dom.toggleClassicExtrude.textContent = state.classicExtrude ? 'ON' : 'OFF';
-    renderNow();
   });
 
   dom.sliderShading.addEventListener('input', () => {
@@ -1507,10 +1678,11 @@ function bindEvents() {
     });
   });
 
-  // パネル収納やモバイルURLバー変動でもキャンバスの実表示寸法とレイキャスト行列を即座に同期する
+  // パネル収納やモバイルURLバー・ボトムシート変動でもキャンバスの実表示寸法とレイキャスト行列を即座に同期する
   if (typeof ResizeObserver !== 'undefined') {
     const ro = new ResizeObserver(() => requestRender());
     ro.observe(dom.viewportContainer);
+    ro.observe(dom.canvas);
   }
   window.addEventListener('resize', () => requestRender());
   mobileMediaQuery.addEventListener('change', () => syncResponsiveLayout());
@@ -1561,7 +1733,9 @@ function pollForRealAssetIfNeeded() {
 }
 
 async function init() {
+  dom.openStripModal.hidden = !isDevMode;
   bindEvents();
+  setUiTheme(state.uiTheme);
   initIroColorPicker();
   syncResponsiveLayout();
   setPaintColor(state.paintColor, '桜ピンク');
@@ -1570,7 +1744,7 @@ async function init() {
   manifestData = await loadVersionManifest();
   state.characterId = manifestData.defaultCharacterId;
   const initialChar = getActiveCharacter();
-  state.versionId = initialChar?.defaultVersion || 'v4';
+  state.versionId = initialChar?.defaultVersion || 'v5';
   renderCharacterSwitcher();
   renderVersionSwitcher();
 
@@ -1589,6 +1763,7 @@ async function init() {
     painter,
     iroPicker,
     iroSliders,
+    isDevMode,
     setAngles: (yawDeg, pitchDeg) => {
       camera.setAngles(yawDeg, pitchDeg);
       renderNow();
@@ -1601,11 +1776,19 @@ async function init() {
       }
     },
     setMode: (mode) => setMode(mode),
+    setUiTheme: (theme) => setUiTheme(theme),
     setOutline: (enabled) => setOutline(enabled),
     setOutlineWidth: (w) => setOutlineWidth(w),
     setPixelSnap: (subdiv) => setPixelSnap(subdiv),
     setCharacter: (id) => setCharacter(id),
     setVersion: (id) => setVersion(id),
+    toggleMod: (modId) => toggleMod(modId),
+    setActiveMods: (ids) => applyActiveMods(ids),
+    getMods: () => (loadedAsset?.mods || []).map((m) => ({
+      id: m.id,
+      label: m.label,
+      enabled: state.activeModIds.includes(m.id),
+    })),
     setPaletteCategory: (cat) => setPaletteCategory(cat),
     getPartCategories: () => getPartCategoriesSummary(),
     setColorHex: (hex) => setPaintColor(hex),
