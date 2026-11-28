@@ -437,49 +437,65 @@ def build_body_v4(vol: list, part: list) -> None:
                     set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
     # ==========================================================================
-    # 4A. 内側体幹・水平肩ベース・広めネックライン (y=14..25)
-    #     なで肩コーンではなく「水平な肩ライン(y=24) → 胸郭(y=21..23) → くびれウエスト(y=17..19)」の骨格にする
+    # 4A. 内側体幹・女性らしい胸の膨らみ＆アンダーバストくびれ・広めネックライン (y=14..25)
+    #     前側(rz_f)と背中側(rz_b)を分離し、鎖骨→自然なバスト膨らみ(y=20.5..21.5)→くびれウエスト(y=17..18)のS字ラインを造形する
     # ==========================================================================
-    in_rx_pts = [(14.0, 5.1), (17.5, 4.4), (20.5, 4.7), (23.0, 5.3), (24.0, 5.4), (25.0, 4.5)]
-    in_rz_pts = [(14.0, 3.7), (17.5, 3.2), (20.5, 3.3), (23.0, 3.2), (24.0, 2.9), (25.0, 2.4)]
+    in_rx_pts = [(14.0, 5.1), (17.5, 4.35), (20.5, 4.85), (22.5, 5.25), (24.0, 5.35), (25.0, 4.5)]
+    in_rz_f_pts = [(14.0, 3.6), (17.5, 3.05), (19.0, 3.55), (21.0, 4.45), (22.5, 4.05), (24.0, 3.15), (25.0, 2.45)]
+    in_rz_b_pts = [(14.0, 3.6), (17.5, 2.95), (20.5, 3.20), (23.0, 3.25), (24.0, 2.90), (25.0, 2.40)]
 
     for y in range(14, 26):
-        rx_i = interp_profile(in_rx_pts, float(y))
-        rz_i = interp_profile(in_rz_pts, float(y))
+        fy = float(y)
+        rx_i = interp_profile(in_rx_pts, fy)
+        rz_if = interp_profile(in_rz_f_pts, fy)
+        rz_ib = interp_profile(in_rz_b_pts, fy)
+        # 左右に柔らかな丸みを持つバスト輪郭（y=19..23 の前面のみ控えめに効かせる）
+        bust_y_env = math.exp(-((fy - 21.0) / 1.55) ** 2)
         for x in range(W):
+            dx = x - CX
+            adx = abs(dx)
+            bust_x_mound = 0.42 * bust_y_env * math.exp(-((adx - 1.95) / 1.45) ** 2)
+            rz_if_local = rz_if + bust_x_mound
             for z in range(D):
-                dx = x - CX
                 dz = z - CZ_BODY
-                # 肩〜胸上(y>=22)は角丸長方形寄りのスーパー楕円(p=2.5)にして水平な鎖骨・肩棚を作る
-                p_t = 2.45 if y >= 22 else 2.0
-                rad = ((abs(dx) / rx_i) ** p_t + (abs(dz) / rz_i) ** p_t) ** (1.0 / p_t)
+                rz_i = rz_if_local if dz >= 0.0 else rz_ib
+                p_t = 2.40 if y >= 22 else 2.0
+                rad = ((adx / rx_i) ** p_t + (abs(dz) / rz_i) ** p_t) ** (1.0 / p_t)
                 if rad <= 1.0:
-                    # 広めの鎖骨ネックライン: y=25 の1行だけ鎖骨〜左肩寄りまで綺麗に肌を見せ、首は4pxの華奢幅とメリハリをつける
+                    # 広めの鎖骨ネックライン: y=25 の1行だけ鎖骨〜左肩寄りまで綺麗に肌を見せる
                     is_wide_neck_skin = (y == 25 and -3.8 <= dx <= 2.9 and dz > -0.35)
                     if is_wide_neck_skin:
                         col = C_SKIN if abs(dx) <= 2.3 else C_SKIN_SH
                         set_vox(vol, part, x, y, z, col, P_SKIN)
-                    elif y == 24 and -3.8 <= dx <= 2.9 and dz > 0.55:
-                        # 広げた襟ぐりに沿うクルーネックリブ影
-                        set_vox(vol, part, x, y, z, C_GRAY_SH, P_OUTFIT)
                     else:
+                        # 謎の模様・左右ぶつ切りを避け、バストの3D立体感に沿った素直な陰影（上面ハイライト→中央ベース→アンダーバスト影）で塗る
                         if dz >= 0.0:
-                            col = C_GRAY_HI if (dx <= 0.4 and y >= 20) else C_GRAY
+                            if y == 24 and -3.4 <= dx <= 2.6 and rad >= 0.78:
+                                col = C_GRAY  # 鎖骨直下の柔らかなクルーネック縁（強すぎる暗帯にしない）
+                            elif y in (21, 22, 23) and rad >= 0.72:
+                                col = C_GRAY_HI  # 胸の丸み上面ハイライト
+                            elif y <= 19:
+                                col = C_GRAY_SH  # アンダーバストの自然な影
+                            else:
+                                col = C_GRAY
                         else:
                             col = C_GRAY if (dx <= -0.4 and y >= 21) else C_GRAY_SH
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
     # ==========================================================================
     # 4B. 外側黒パーカー外殻 (y=13..25)
-    #     胸〜ウエストはすっきりくびれ、裾(y=13..15)だけ程よくゆとりを持たせる。
-    #     右肩は水平な肩幅(rx=6.2)で綺麗に構え、左肩は水平インナー肩を見せたまま y<=21 へずり落ちて3D段差を作る。
+    #     胸の膨らみ〜ウエストくびれに沿いつつ約1vox厚みの外殻を纏い、左肩は水平インナー肩を見せたまま y<=21 へずり落ちる
     # ==========================================================================
-    out_rx_pts = [(13.0, 6.2), (15.5, 5.7), (18.5, 5.3), (21.5, 5.7), (23.5, 6.1), (24.5, 5.9), (25.0, 5.0)]
-    out_rz_pts = [(13.0, 4.5), (15.5, 4.2), (18.5, 4.0), (21.5, 4.1), (23.5, 3.9), (24.5, 3.5), (25.0, 3.0)]
+    out_rx_pts = [(13.0, 6.1), (15.5, 5.55), (18.0, 5.15), (21.0, 5.75), (23.5, 6.05), (24.5, 5.85), (25.0, 5.0)]
+    out_rz_f_pts = [(13.0, 4.35), (15.5, 3.95), (18.0, 3.75), (21.0, 4.95), (23.0, 4.45), (24.5, 3.65), (25.0, 3.05)]
+    out_rz_b_pts = [(13.0, 4.35), (15.5, 3.95), (18.0, 3.65), (21.0, 3.95), (23.5, 3.85), (24.5, 3.45), (25.0, 2.95)]
 
     for y in range(13, 26):
-        rx_b = interp_profile(out_rx_pts, float(y))
-        rz_b = interp_profile(out_rz_pts, float(y))
+        fy = float(y)
+        rx_b = interp_profile(out_rx_pts, fy)
+        rz_bf = interp_profile(out_rz_f_pts, fy)
+        rz_bb = interp_profile(out_rz_b_pts, fy)
+        bust_y_env = math.exp(-((fy - 21.0) / 1.65) ** 2)
         if y >= 18:
             u = (y - 18.0) / 7.0
             open_left = -(1.1 + 5.5 * (u ** 0.80))
@@ -489,15 +505,19 @@ def build_body_v4(vol: list, part: list) -> None:
             open_right = -1.0
 
         for x in range(W):
+            dx = x - CX
+            adx = abs(dx)
+            bust_x_mound = 0.38 * bust_y_env * math.exp(-((adx - 2.15) / 1.55) ** 2)
+            rz_bf_local = rz_bf + bust_x_mound
             for z in range(D):
-                dx = x - CX
                 dz = z - CZ_BODY
-                p_o = 2.45 if y >= 22 else 2.0
-                rad = ((abs(dx) / rx_b) ** p_o + (abs(dz) / rz_b) ** p_o) ** (1.0 / p_o)
+                rz_b = rz_bf_local if dz >= 0.0 else rz_bb
+                p_o = 2.40 if y >= 22 else 2.0
+                rad = ((adx / rx_b) ** p_o + (abs(dz) / rz_b) ** p_o) ** (1.0 / p_o)
                 if rad > 1.0:
                     continue
 
-                # 前面V開き領域では外側黒パーカーを省き、約1vox奥へ凹んだグレーインナー＆広め鎖骨を露出させる
+                # 前面V開き領域では外側黒パーカーを省き、奥へ凹んだ綺麗なグレーインナー＆バストライン＆鎖骨を露出させる
                 if dz > -0.15 and open_left <= dx <= open_right:
                     continue
                 # 向かって左肩(dx <= -0.6, y>=22)はパーカーが脱げているため外殻を省き、水平インナー肩との3D段差を作る
@@ -508,10 +528,15 @@ def build_body_v4(vol: list, part: list) -> None:
                     continue
 
                 is_slipped_top_rim = (y == 21 and dx <= -1.0 and dz >= -2.2 and rad >= 0.70)
+                is_bust_front_hi = (dz > 1.2 and 20 <= y <= 22 and rad >= 0.80)
                 if y == 13:
                     col = C_DARK
                 elif is_slipped_top_rim:
                     col = C_HOODIE_HI
+                elif is_bust_front_hi:
+                    col = C_HOODIE
+                elif dz > 0.4 and y <= 18 and rad >= 0.82:
+                    col = C_HOODIE_SH  # 胸下のくびれ影
                 elif rad >= 0.84 and dz > 0.4 and dx < -0.4:
                     col = C_HOODIE
                 elif dz < -1.0:
@@ -520,27 +545,14 @@ def build_body_v4(vol: list, part: list) -> None:
                     col = C_HOODIE if dx < 0 else C_HOODIE_SH
                 set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
-    # 銀ジッパー（下半分 y=13..17 の中央半上げジップ＆引き手 + V開き外殻フチに沿った銀前立て）
-    for y in range(13, 25):
-        if y <= 17:
-            zx = int(round(CX))
-            for z in range(D - 1, int(CZ_BODY), -1):
-                if vol[zx][y][z] != -1:
-                    col_z = C_WHITE if y == 17 else (C_GRAY_HI if y >= 15 else C_GRAY)
-                    set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
-                    set_vox(vol, part, zx, y, z + 1, col_z, P_OUTFIT)
-                    break
-        else:
-            u = (y - 18.0) / 7.0
-            for zx_f in (CX - (1.3 + 5.2 * (u ** 0.80)), CX + (1.4 + 2.5 * u)):
-                if y >= 22 and zx_f < CX:
-                    continue
-                zx = int(round(zx_f))
-                for z in range(D - 1, int(CZ_BODY), -1):
-                    if vol[zx][y][z] != -1 and part[zx][y][z] == P_OUTFIT:
-                        col_z = C_GRAY_HI if y >= 21 else C_GRAY
-                        set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
-                        break
+    # 半上げ中央銀ジッパー（下半分 y=13..17 の閉じた黒パーカー中央のみに配置し、上部のグレーインナーと同化させない）
+    for y in range(13, 18):
+        zx = int(round(CX))
+        for z in range(D - 1, int(CZ_BODY), -1):
+            if vol[zx][y][z] != -1:
+                col_z = C_WHITE if y == 17 else (C_GRAY_HI if y >= 15 else C_GRAY)
+                set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
+                break
 
     # ==========================================================================
     # 5. 水平な肩頭(三角筋)→脇の抜けがある細身二の腕→丸く膨らむ萌え袖 (y=12..24)
