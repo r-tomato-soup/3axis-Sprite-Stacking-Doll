@@ -30,14 +30,14 @@ PALETTE_HEX = [
     "#473E58",  # 2: C_HAIR (黒髪 ベース)
     "#625777",  # 3: C_HAIR_HI (黒髪 天使の輪・明部)
     "#82769A",  # 4: C_HAIR_SPEC (黒髪 ツヤ芯)
-    "#FDF5F2",  # 5: C_SKIN (肌ベース)
-    "#EBD7D1",  # 6: C_SKIN_SH (肌影・顎下・前髪落とし影)
-    "#F5D5DC",  # 7: C_BLUSH_LIGHT (淡チーク)
-    "#E8B6C5",  # 8: C_BLUSH_DEEP (濃チーク)
-    "#2E2737",  # 9: C_EYE_LASH (ジト目まつ毛バー)
-    "#6B5F8E",  # 10: C_EYE_HIGH (瞳上段スレート紫・柔らかめ)
-    "#9B8ED0",  # 11: C_EYE_MID (瞳中段パステルラベンダー)
-    "#C8BFF2",  # 12: C_EYE_LOW (瞳下段明るめパステルラベンダー・白ハイライトなし)
+    "#FDF8F3",  # 5: C_SKIN (肌ベース・Char2準拠)
+    "#EEE0D6",  # 6: C_SKIN_SH (肌影・顎下・脚影・Char2準拠)
+    "#F2D8D7",  # 7: C_BLUSH_LIGHT (淡チーク・Char2準拠)
+    "#E8C6C8",  # 8: C_BLUSH_DEEP (濃チーク・Char2準拠)
+    "#5F5763",  # 9: C_EYE_LASH (ジト目まつ毛バー・Char2準拠)
+    "#8D84A8",  # 10: C_EYE_HIGH (瞳上段ラベンダーバイオレット・Char2準拠)
+    "#B9B2D0",  # 11: C_EYE_LOW (瞳中段ラベンダー・Char2準拠)
+    "#D8D3EA",  # 12: C_EYE_WHITE (瞳下部・目頭淡ラベンダー光沢・Char2準拠)
     "#23212E",  # 13: C_DARK (パーカー深影・靴底・ガーターストラップ)
     "#323041",  # 14: C_HOODIE_SH (パーカー影・ニーハイ本体・厚底側面)
     "#454357",  # 15: C_HOODIE (パーカーベース・革靴ベース)
@@ -51,6 +51,7 @@ PALETTE_HEX = [
     "#42384E",  # 23: C_ACC_DARK (うさぎ目ドット・細部引き締め)
     "#E8AEC2",  # 24: C_PINK_BAND (白絆創膏の中央ピンクガーゼ)
     "#C49EDE",  # 25: C_LAVENDER_GEM (ツインテリボン中央の淡紫ハート宝石)
+    "#FFFFFF",  # 26: C_EYE_SPARKLE (瞳純白ハイライト・Char2準拠)
 ]
 
 (
@@ -65,8 +66,8 @@ PALETTE_HEX = [
     C_BLUSH_DEEP,
     C_EYE_LASH,
     C_EYE_HIGH,
-    C_EYE_MID,
     C_EYE_LOW,
+    C_EYE_WHITE,
     C_DARK,
     C_HOODIE_SH,
     C_HOODIE,
@@ -80,6 +81,7 @@ PALETTE_HEX = [
     C_ACC_DARK,
     C_PINK_BAND,
     C_LAVENDER_GEM,
+    C_EYE_SPARKLE,
 ) = range(len(PALETTE_HEX))
 
 PARTS_DEF = [
@@ -104,9 +106,10 @@ PARTS_DEF = [
     P_BERET,
 ) = range(len(PARTS_DEF))
 
-CX = (W - 1) * 0.5  # 28.5
+CX = (W - 1) * 0.5  # 28.5 (Char2 cx0=25.5 に対し厳密に +3.0)
 CZ_BODY = 20.5
-CZ_HEAD = 21.0
+# Char2 cz_head=19.6 に対し厳密な整数シフト(+1.0)に合わせ、頭・顔・前髪・目のボクセル丸めを完全一致させる
+CZ_HEAD = 20.6
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
@@ -121,6 +124,29 @@ def clamp(v: float, lo: float, hi: float) -> float:
 def smoothstep(e0: float, e1: float, x: float) -> float:
     t = clamp((x - e0) / (e1 - e0), 0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
+
+
+def catmull_rom_interp(points: list[tuple[float, float]], y_q: float) -> float:
+    if y_q <= points[0][0]:
+        return points[0][1]
+    if y_q >= points[-1][0]:
+        return points[-1][1]
+    for i in range(len(points) - 1):
+        y0, v0 = points[i]
+        y1, v1 = points[i + 1]
+        if y0 <= y_q <= y1:
+            t = (y_q - y0) / (y1 - y0)
+            p_prev = points[max(0, i - 1)][1]
+            p_next = points[min(len(points) - 1, i + 2)][1]
+            t2 = t * t
+            t3 = t2 * t
+            return 0.5 * (
+                (2.0 * v0)
+                + (-p_prev + v1) * t
+                + (2.0 * p_prev - 5.0 * v0 + 4.0 * v1 - p_next) * t2
+                + (-p_prev + 3.0 * v0 - 3.0 * v1 + p_next) * t3
+            )
+    return points[-1][1]
 
 
 def interp_profile(pts: list[tuple[float, float]], y: float) -> float:
@@ -596,210 +622,292 @@ def build_core_body(vol: list, part: list) -> None:
                 set_vox(vol, part, x, 34, z, col, P_SKIN)
 
     # ==========================================================================
-    # 7. 頭部・もちっと顎（余分な顎下1行なし）・顔・ジト目・前髪・ばってん＆白うさぎピン (y=35..54)
+    # 7. 頭部・顔・前髪・垂れ横髪・ジト目・ばってん＆白うさぎピン (y=35..54)
+    #    Char2 (sharp_jaw_hair=True, y_raw=27..46 -> y=y_raw+8) の輪郭・顔面・チーク・
+    #    前髪束＆目頭スリット・垂れ横髪・6x4ジト目を1:1座標で完全移植し、ゆの黒髪パレットで塗る
     # ==========================================================================
-    # 顎底 y=35（丸くもちっと締まる）〜頭頂 y=54（高さ20vox、幅25vox）
-    rx_head_pts = [
-        (35.0, 7.6),
-        (36.5, 10.6),
-        (38.5, 12.1),
-        (41.5, 12.6),
-        (45.5, 12.6),
-        (49.0, 11.9),
-        (51.5, 10.2),
-        (53.0, 7.6),
-        (54.0, 4.4),
+    head_y_shift = 8  # Char2 y_raw=27..46 (sharp_jaw_hair時 y=26..45) -> char3 y=35..54
+
+    rx_profile = [
+        (26.0, 5.8),
+        (27.0, 8.8),
+        (28.5, 11.4),
+        (30.5, 12.6),
+        (33.5, 12.9),
+        (37.5, 12.8),
+        (41.0, 12.0),
+        (43.5, 10.2),
+        (45.0, 7.6),
+        (46.0, 4.3),
     ]
-    # 側面でおでこ〜前髪が絶壁にもひさし状にもならないよう、char2標本準拠の丸みドーム曲線にする
-    rz_front_pts = [
-        (35.0, 6.2),
-        (37.0, 7.8),
-        (40.0, 8.6),
-        (44.0, 8.9),
-        (47.5, 8.9),
-        (50.5, 8.3),
-        (52.5, 6.9),
-        (53.5, 5.2),
-        (54.0, 3.6),
+    rz_front_profile = [
+        (26.0, 4.9),
+        (27.5, 7.0),
+        (30.0, 8.3),
+        (33.0, 8.6),
+        (37.0, 8.7),
+        (41.0, 8.2),
+        (43.8, 6.7),
+        (45.0, 5.0),
+        (46.0, 3.0),
     ]
-    rz_back_pts = [
-        (35.0, 6.8),
-        (38.0, 8.8),
-        (42.5, 9.8),
-        (47.0, 9.6),
-        (50.5, 8.4),
-        (53.0, 5.8),
-        (54.0, 3.4),
+    rz_back_profile = [
+        (26.0, 5.1),
+        (28.0, 7.5),
+        (32.0, 9.2),
+        (37.0, 9.7),
+        (41.5, 9.0),
+        (44.2, 7.1),
+        (45.2, 5.2),
+        (46.0, 3.2),
     ]
 
-    for y in range(35, 55):
-        fy = float(y)
-        rx_h = interp_profile(rx_head_pts, fy)
-        rz_f = interp_profile(rz_front_pts, fy)
-        rz_b = interp_profile(rz_back_pts, fy)
+    for y_raw in range(27, 47):
+        fy = float(y_raw)
+        y = y_raw + head_y_shift
+        rx_h = catmull_rom_interp(rx_profile, fy)
+        rz_f = catmull_rom_interp(rz_front_profile, fy)
+        rz_b = catmull_rom_interp(rz_back_profile, fy)
+        # Char2 sharp_jaw_hair=True 同一のすっきりもちっと下顎ライン
+        if y_raw == 27:
+            rx_h = 8.1
 
         for x in range(W):
             dx = x - CX
             adx = abs(dx)
             for z in range(D):
                 dz = z - CZ_HEAD
-                rz_h = rz_f if dz >= 0 else rz_b
+                rz_h = rz_f if dz >= 0.0 else rz_b
                 nx = adx / rx_h
                 nz = abs(dz) / rz_h
-                p_exp = 2.05 + 0.15 * smoothstep(0.0, 3.0, dz) * smoothstep(35.0, 38.0, fy)
+                p_exp = 2.0 + 0.18 * smoothstep(0.0, 3.0, dz) * smoothstep(26.0, 29.0, fy) * smoothstep(44.0, 38.0, fy)
                 r_ell = (nx ** p_exp + nz ** p_exp) ** (1.0 / p_exp)
                 if r_ell <= 1.0:
-                    face_w = 9.4 - 0.15 * max(0.0, 38.0 - fy)
-                    is_face = (dz > 1.6) and (
-                        (y <= 42 and adx <= face_w)
-                        or (43 <= y <= 45 and adx <= 5.5)
+                    face_width_limit = 9.9 - 0.16 * max(0.0, 30.0 - fy)
+                    is_face_zone = (dz > 1.7) and (
+                        (y_raw <= 33 and adx <= face_width_limit)
+                        or (34 <= y_raw <= 36 and adx <= 5.6)
                     )
-                    if is_face:
-                        if y == 35:
-                            col = C_SKIN_SH  # もちっと顎下の柔らか影
-                        elif y == 37 and 6.8 <= adx <= 9.2 and r_ell >= 0.72:
+                    if is_face_zone:
+                        if y_raw == 27:
+                            col = C_SKIN_SH
+                        elif y_raw == 29 and 6.8 <= adx <= 9.2 and r_ell >= 0.74:
                             col = C_BLUSH_DEEP if (7.2 <= adx <= 8.6) else C_BLUSH_LIGHT
-                        elif y == 36 and 7.0 <= adx <= 9.0 and r_ell >= 0.80:
+                        elif y_raw == 28 and 7.2 <= adx <= 8.8 and r_ell >= 0.84:
                             col = C_BLUSH_LIGHT
-                        elif r_ell >= 0.88 and adx >= 8.2:
+                        elif r_ell >= 0.89 and adx >= 8.3:
                             col = C_SKIN_SH
                         else:
                             col = C_SKIN
-                        set_vox(vol, part, x, y, z, col, P_SKIN)
                     else:
-                        # 黒髪ドーム＋360度天使の輪ツヤ帯 (y=49..51)
-                        if 49 <= y <= 51 and r_ell >= 0.80:
-                            if y == 50 and dx <= 2.0 and dz >= -4.0:
+                        if y_raw >= 42:
+                            if y_raw == 46 and r_ell <= 0.24:
+                                col = C_HAIR_SH1
+                            elif y_raw in (43, 44) and r_ell >= 0.85 and -3.5 <= dx <= 1.5 and dz < 4.5:
                                 col = C_HAIR_SPEC
-                            elif y in (49, 50) and int(round(adx)) not in (2, 7):
-                                col = C_HAIR_HI
                             else:
-                                col = C_HAIR
-                        elif y >= 52:
-                            col = C_HAIR_HI if dx <= 2.5 else C_HAIR
-                        elif y >= 43:
-                            col = C_HAIR if dz >= -1.5 else C_HAIR_SH1
+                                col = C_HAIR_HI
+                        elif y_raw >= 37:
+                            col = C_HAIR if dz < 1.8 else C_HAIR_HI
+                        elif y_raw >= 30:
+                            col = C_HAIR_SH1 if dz < -1.2 else C_HAIR
                         else:
-                            col = C_HAIR_SH1 if dz >= -3.0 else C_HAIR_SH2
-                        # 後ろ髪の縦毛束割れアクセント
-                        if dz < -4.0 and r_ell >= 0.85 and 36 <= y <= 48:
-                            if int(round(adx)) in (0, 4, 8):
-                                col = C_HAIR_SH2
-                        set_vox(vol, part, x, y, z, col, P_HAIR)
+                            col = C_HAIR_SH2
 
-    # 後ろ髪ボブの下がり (y=32..36, 頭後ろ〜首後ろの丸みボブ)
-    for y in range(32, 37):
-        t = (36.0 - y) / 4.0
-        rx_bk = 11.4 - 0.6 * t
-        rz_bk = 9.2 - 0.8 * t
+                        if dz < -3.4 and r_ell >= 0.84 and 28 <= y_raw <= 41:
+                            t_back = (y_raw - 28.0) / 13.0
+                            curve_target = 2.2 + 3.5 * (t_back ** 0.8)
+                            if abs(adx - curve_target) < 0.52 or (y_raw <= 33 and adx < 0.60):
+                                col = C_HAIR_SH2
+                    set_vox(vol, part, x, y, z, col, P_SKIN if is_face_zone else P_HAIR)
+
+    # 後ろ髪ボブの襟足カーブ (y=33..35, 正面の顎〜垂れ横髪間の抜け感を塞がないよう肩幅内に収める)
+    for y in range(33, 36):
+        t = (35.0 - y) / 2.0
+        rx_bk = 7.4 - 2.4 * t
+        rz_bk = 7.6 - 1.4 * t
         for x in range(W):
             for z in range(D):
                 dx = x - CX
                 dz = z - CZ_HEAD
-                if dz > -1.0:
+                if dz > -2.0:
                     continue
                 rad = math.sqrt((dx / rx_bk) ** 2 + (dz / rz_bk) ** 2)
-                if 0.62 <= rad <= 1.0:
-                    col = C_HAIR_SH2 if (y <= 33 or int(round(abs(dx))) in (0, 4, 8)) else C_HAIR_SH1
+                if 0.60 <= rad <= 1.0:
+                    col = C_HAIR_SH2 if (y == 33 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
-    # 大きめデフォルメ・たれ目寄りジト目 (y=37..41, 幅6vox, 表面から3vox+隣接Z段差埋め込みで斜め縦割れ防止・白点ハイライトなし)
-    for side in (-1.0, 1.0):
-        # 左目 x=20..25 (local_u=0が外目尻..5が内目頭), 右目 x=37..32 (対称)
-        ex_list = list(range(20, 26)) if side < 0 else list(range(37, 31, -1))
-        for y in range(37, 42):
-            z_surfs: dict[int, int] = {}
-            for x in ex_list:
-                front_z = -1
-                for z in range(D - 1, int(CZ_HEAD), -1):
-                    if vol[x][y][z] != -1 and part[x][y][z] == P_SKIN:
-                        front_z = z
-                        break
-                z_surfs[x] = front_z
+    # Char2 1:1移植: 重めレイヤー前髪（中央束＋縁影＋目頭ツイン縦肌スリット＋まつ毛上のフラット裾） (y_raw=32..45 -> y=40..53)
+    for y_raw in range(32, 46):
+        fy = float(y_raw)
+        y = y_raw + head_y_shift
+        rx_h = catmull_rom_interp(rx_profile, fy) + 0.32 * smoothstep(32.5, 38.0, fy)
+        rz_f = catmull_rom_interp(rz_front_profile, fy)
+        bang_arch = smoothstep(31.5, 38.5, fy) * (1.0 - 0.70 * smoothstep(41.5, 45.5, fy))
+        bang_extra_z = 0.42 + 0.92 * bang_arch
 
-            for local_u, x in enumerate(ex_list):
-                front_z = z_surfs[x]
-                if front_z < 0:
-                    continue
-                col_e: int | None = None
-                if y == 41:
-                    # 上まつ毛バーは外目尻(u=0)を1段下げて柔らかなタレ目ラインにする
-                    if local_u >= 1:
-                        col_e = C_EYE_LASH
-                elif y == 40:
-                    col_e = C_EYE_LASH if local_u == 0 else C_EYE_HIGH
-                elif y == 39:
-                    col_e = C_EYE_HIGH if local_u == 0 else C_EYE_MID
-                elif y == 38:
-                    if local_u >= 1:
-                        col_e = C_EYE_LOW
-                else:
-                    # y=37: 下まぶた中央を丸く膨らませて幼いデフォルメ瞳にする
-                    if 2 <= local_u <= 4:
-                        col_e = C_EYE_LOW
-
-                if col_e is None:
-                    continue
-                neigh_z = [z_surfs[nx] for nx in (x - 1, x + 1) if nx in z_surfs and z_surfs[nx] >= 0]
-                fill_min_z = max(int(CZ_HEAD) + 2, min([front_z - 2] + neigh_z))
-                for z_fill in range(fill_min_z, front_z + 1):
-                    set_vox(vol, part, x, y, z_fill, col_e, P_EYES)
-
-    # ふっくら丸み前髪（中央重め束を1〜2vox切り上げて抜け感を出し、側面おでこカーブを滑らかに丸める） (y=41..53)
-    for y in range(41, 54):
-        fy = float(y)
-        rx_h = interp_profile(rx_head_pts, fy) + 0.30 * smoothstep(41.0, 47.0, fy)
-        rz_f = interp_profile(rz_front_pts, fy)
-        # 額上部(y=46..49)をピークに緩やかに張り出すドーム曲線で、側面シルエットをchar2風の丸いおでこにする
-        bang_arch = smoothstep(40.5, 46.5, fy) * (1.0 - 0.65 * smoothstep(50.0, 53.8, fy))
-        bang_extra_z = 0.35 + 0.95 * bang_arch
         for x in range(W):
             dx = x - CX
             adx = abs(dx)
-            if adx > 11.4:
+            if adx > 11.2:
                 continue
-            # y=41は目・眉間上を全て開け、y=42も中央の重い毛束をスッキリ切り上げてデフォルメ瞳を引き立てる
-            if y == 41 and adx < 8.8:
+            if y_raw in (32, 33) and adx > 2.6:
                 continue
-            if y == 42 and (adx <= 3.1 or (-6.4 <= dx <= -5.2)):
+            if y_raw == 34 and (3.2 <= adx <= 4.8):
                 continue
-            if y == 43 and ((1.8 <= adx <= 3.1) or (-6.2 <= dx <= -5.4)):
+            if y_raw == 35 and (3.2 <= adx <= 4.7):
                 continue
-            for z in range(int(CZ_HEAD + 2), D):
+            if y_raw == 36 and (3.3 <= adx <= 4.1):
+                continue
+
+            for z in range(int(CZ_HEAD + 1), D):
                 dz = z - CZ_HEAD
                 nx = adx / rx_h
                 nz = dz / (rz_f + bang_extra_z)
-                r_b = (nx ** 2.1 + nz ** 2.1) ** (1.0 / 2.1)
-                if 0.76 <= r_b <= 1.0:
-                    if 49 <= y <= 51 and adx <= 7.5:
-                        col = C_HAIR_SPEC if (y == 50 and -4.5 <= dx <= 0.5) else C_HAIR_HI
-                    elif y <= 45 and int(round(adx)) in (2, 5, 8):
-                        col = C_HAIR_SH2  # 縦の毛束割れ影
-                    elif y == 41 or y == 42:
+                p_b = 2.15
+                r_b = (nx ** p_b + nz ** p_b) ** (1.0 / p_b)
+                if 0.77 <= r_b <= 1.0:
+                    if y_raw >= 42:
+                        col = C_HAIR_HI
+                    elif y_raw in (32, 33, 34) and abs(adx - 2.5) < 0.45:
+                        col = C_HAIR_SH2
+                    elif y_raw == 35 and abs(adx - 2.5) < 0.45:
                         col = C_HAIR_SH1
+                    elif y_raw == 34 and abs(adx - 5.5) < 0.45:
+                        col = C_HAIR_SH2
+                    elif y_raw == 35 and abs(adx - 5.5) < 0.45:
+                        col = C_HAIR_SH1
+                    elif y_raw == 34 and 5.8 <= adx <= 9.6 and r_b >= 0.86:
+                        col = C_HAIR_SH1
+                    elif y_raw == 32 and adx <= 2.1:
+                        col = C_HAIR
+                    elif 33 <= y_raw <= 41 and r_b >= 0.87 and (
+                        (abs(dx + 0.5) < 0.45 and y_raw >= 33)
+                        or (abs(adx - 4.5) < 0.45 and y_raw >= 37)
+                        or (abs(adx - 7.5) < 0.45 and y_raw >= 36)
+                    ):
+                        col = C_HAIR_HI
+                    elif y_raw == 41:
+                        col = C_HAIR_HI if (int(round(adx)) % 2 == 0 or adx <= 2.5) else C_HAIR
                     else:
-                        col = C_HAIR if dx <= 2.0 else C_HAIR_SH1
+                        col = C_HAIR
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
-    # 顔周りの垂れ横髪（頬から約1vox空気感を保って顎下 y=33 まで垂れる姫カット／ボブ横髪！）
-    for side in (-1.0, 1.0):
-        for y in range(33, 46):
-            t = (45.0 - y) / 12.0
-            sx = CX + side * (11.6 - 0.8 * (t ** 1.1))
-            sz = CZ_HEAD + 3.4 - 0.8 * t
-            rx_s = 1.65 - 0.45 * t
-            rz_s = 2.45 - 0.65 * t
+    # Char2 1:1移植: 顔周りの横髪 (y_raw=28..41 -> y=36..49) + 顎下垂れ毛束 (y_c2=25..29 -> y=34..38)
+    for y_raw in range(28, 42):
+        y = y_raw + head_y_shift
+        for side in (-1.0, 1.0):
             for x in range(W):
-                for z in range(D):
-                    nx = (x - sx) / rx_s
-                    nz = (z - sz) / rz_s
-                    if nx * nx + nz * nz <= 1.0:
-                        col = C_HAIR_SH2 if y <= 34 else (C_HAIR if side < 0 else C_HAIR_SH1)
+                dx_s = (x - CX) * side
+                if not (9.3 <= dx_s <= 13.5):
+                    continue
+                for z in range(int(CZ_HEAD - 2), int(CZ_HEAD + 6)):
+                    dz = z - CZ_HEAD
+                    z_front_limit = 2.3 if y_raw <= 33 else 4.2
+                    if dz > z_front_limit or dz < -1.4:
+                        continue
+                    rx_lock = 13.25 if y_raw >= 31 else (12.85 if y_raw == 30 else 12.25)
+                    rz_lock = 8.95
+                    r_l = math.sqrt((dx_s / rx_lock) ** 2 + (dz / rz_lock) ** 2)
+                    if 0.80 <= r_l <= 1.02:
+                        if y_raw == 28:
+                            col = C_HAIR_SH2
+                        elif y_raw == 29:
+                            col = C_HAIR_SH1 if dx_s < 11.8 else C_HAIR_SH2
+                        elif y_raw >= 38:
+                            col = C_HAIR
+                        else:
+                            col = C_HAIR_SH1 if (dx_s >= 12.1 and dz < 0.5) else C_HAIR
                         set_vox(vol, part, x, y, z, col, P_HAIR)
 
-    # 前髪ヘアアクセ2種（front_z+1へ突き出させず前髪曲面に沿って埋め込むことで、斜め3/4のトゲ化を防ぎ側面でも自然な曲線上に見える）
-    # (1) ばってん(✕)ヘアピン (x=31..33, y=47..49・ベレー帽縁の下にすっきり収まる高さ)
-    b_pts = [(31, 49), (33, 49), (32, 48), (31, 47), (33, 47)]
+    for y_c2 in range(25, 30):
+        y = y_c2 + 9  # Char2 sharp_jaw_hair の y=25..29 -> char3 y=34..38
+        t_hang = clamp((29.0 - y_c2) / 4.0, 0.0, 1.0)
+        lock_cx = 11.55 - 0.35 * t_hang
+        lock_rx = 1.65 - 0.55 * (t_hang ** 1.2)
+        lock_cz = CZ_HEAD + 2.35 - 0.35 * t_hang
+        lock_rz = 1.75 - 0.45 * t_hang
+        for side in (-1.0, 1.0):
+            cx_s = CX + side * lock_cx
+            for x in range(W):
+                adx = abs(x - CX)
+                if y_c2 <= 27 and adx < 10.0:
+                    continue
+                for z in range(int(CZ_HEAD), int(CZ_HEAD + 7)):
+                    nx = (x - cx_s) / max(0.75, lock_rx)
+                    nz = (z - lock_cz) / max(0.75, lock_rz)
+                    if nx * nx + nz * nz <= 1.0:
+                        if y_c2 == 25:
+                            col = C_HAIR_SH2
+                        elif y_c2 == 26:
+                            col = C_HAIR_SH1 if (z >= lock_cz - 0.2) else C_HAIR_SH2
+                        elif (side * (x - cx_s)) > 0.35 and z < lock_cz:
+                            col = C_HAIR_SH1
+                        else:
+                            col = C_HAIR
+                        set_vox(vol, part, x, y, z, col, P_HAIR)
+
+    # Char2 1:1移植: 眠たげジト目 (y_raw=30..33 -> y=38..41, lx=19..24 対称ミラー, 3vox深め埋め込み)
+    def set_sym(x_left: int, y_pos: int, z_pos: int, c_idx: int, p_idx: int) -> None:
+        set_vox(vol, part, x_left, y_pos, z_pos, c_idx, p_idx)
+        set_vox(vol, part, W - 1 - x_left, y_pos, z_pos, c_idx, p_idx)
+
+    for eye_y_raw in range(30, 34):
+        eye_y = eye_y_raw + head_y_shift
+        z_surfs: dict[int, int] = {}
+        for lx in range(19, 25):
+            zs = -1
+            for z in range(D - 1, int(CZ_HEAD), -1):
+                if vol[lx][eye_y][z] != -1:
+                    zs = z
+                    break
+            z_surfs[lx] = zs
+
+        for lx in range(19, 25):
+            z_surf = z_surfs[lx]
+            if z_surf == -1:
+                continue
+            local_u = lx - 19
+            if local_u == 0:
+                for z_off in (0, 1, 2):
+                    if eye_y_raw == 33:
+                        c_side = C_EYE_LASH
+                    elif eye_y_raw == 32:
+                        c_side = C_EYE_HIGH
+                    elif eye_y_raw == 31:
+                        c_side = C_EYE_LOW if z_off == 0 else C_EYE_WHITE
+                    else:
+                        c_side = C_SKIN
+                    set_sym(lx, eye_y, z_surf - z_off, c_side, P_SKIN if c_side == C_SKIN else P_EYES)
+                continue
+
+            if eye_y_raw == 33:
+                col = C_EYE_LASH
+            elif eye_y_raw == 32:
+                col = C_EYE_HIGH
+            elif eye_y_raw == 31:
+                if local_u == 1:
+                    col = C_EYE_SPARKLE
+                elif local_u == 5:
+                    col = C_EYE_WHITE
+                else:
+                    col = C_EYE_LOW
+            else:
+                col = C_EYE_WHITE if 1 <= local_u <= 4 else C_SKIN
+
+            neighbor_min_z = min(
+                z_surfs.get(lx - 1, z_surf),
+                z_surfs.get(lx + 1, z_surf),
+                z_surf - 2,
+            )
+            fill_min_z = max(int(CZ_HEAD) + 2, neighbor_min_z)
+            eye_part = P_SKIN if col == C_SKIN else P_EYES
+            for z_fill in range(fill_min_z, z_surf + 1):
+                set_sym(lx, eye_y, z_fill, col, eye_part)
+
+    # 前髪ヘアアクセ2種（目頭スリット x=32..33, y=42..44 および目まつ毛 y=41 を一切塞がず、ベレー帽縁の下に収める）
+    # (1) ばってん(✕)ヘアピン (x=30..32, y=47..49)
+    b_pts = [(30, 49), (32, 49), (31, 48), (30, 47), (32, 47)]
     for bx, by in b_pts:
         front_z = -1
         for z in range(D - 1, int(CZ_HEAD), -1):
@@ -810,12 +918,12 @@ def build_core_body(vol: list, part: list) -> None:
             set_vox(vol, part, bx, by, front_z, C_WHITE, P_ACC)
             set_vox(vol, part, bx, by, front_z - 1, C_WHITE, P_ACC)
 
-    # (2) 小さい白いうさぎ顔ピン (x=33..37, y=42..45・目まつ毛y=41と1px離して視認性向上)
+    # (2) 小さい白いうさぎ顔ピン (x=34..38, y=44..47・目頭スリットと前髪裾影を避けて右目上に綺麗に配置)
     u_pattern = [
-        (45, [(34, C_WHITE), (36, C_WHITE)]),
-        (44, [(33, C_WHITE), (34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE)]),
-        (43, [(33, C_WHITE), (34, C_ACC_DARK), (35, C_WHITE), (36, C_ACC_DARK), (37, C_WHITE)]),
-        (42, [(34, C_WHITE_SH), (35, C_WHITE_SH), (36, C_WHITE_SH)]),
+        (47, [(35, C_WHITE), (37, C_WHITE)]),
+        (46, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
+        (45, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
+        (44, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
     ]
     for uy, row_items in u_pattern:
         for ux, uc in row_items:
