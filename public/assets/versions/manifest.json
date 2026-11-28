@@ -48,7 +48,7 @@
       "id": "char3",
       "name": "ゆ",
       "shortLabel": "ゆ",
-      "defaultVersion": "char3_v3",
+      "defaultVersion": "char3_v4",
       "versions": [
         {
           "id": "char3_v1",
@@ -61,7 +61,7 @@
         {
           "id": "char3_v2",
           "label": "v2: キャラ2顔 1:1",
-          "shortLabel": "v2 キャラ2顔",
+          "shortLabel": "v2 顔2",
           "description": "CHARACTER 2 (v5) の顔・目・前髪を1:1移植",
           "basePath": "./assets/char3/v2/",
           "model": "./assets/char3/v2/model.json"
@@ -69,10 +69,18 @@
         {
           "id": "char3_v3",
           "label": "v3: 元の前髪ミックス",
-          "shortLabel": "v3 元の前髪",
-          "description": "CHARACTER 2 の可愛い顔・目 × 元の黒髪前髪ニュアンス",
+          "shortLabel": "v3 標準",
+          "description": "CHARACTER 2 の可愛い顔・目 × 元の黒髪前髪ニュアンス（標準体格）",
           "basePath": "./assets/char3/",
           "model": "./assets/char3/model.json"
+        },
+        {
+          "id": "char3_v4",
+          "label": "v4: 華奢シルエット・3Dはだけ",
+          "shortLabel": "v4 華奢",
+          "description": "華奢な肩・細身着痩せ・3D段差はだけパーカー・広めネック・+1px首・低め腰バランス",
+          "basePath": "./assets/char3/v4/",
+          "model": "./assets/char3/v4/model.json"
         }
       ]
     }
