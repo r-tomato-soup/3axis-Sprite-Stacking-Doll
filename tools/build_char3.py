@@ -52,7 +52,8 @@ PALETTE_HEX = [
     "#E8AEC2",  # 24: C_PINK_BAND (白絆創膏の中央ピンクガーゼ)
     "#C49EDE",  # 25: C_LAVENDER_GEM (ツインテリボン中央の淡紫ハート宝石)
     "#FFFFFF",  # 26: C_EYE_SPARKLE (瞳純白ハイライト・Char2準拠)
-    "#E8B0DD",  # 27: C_PINK_SHOE (靴の甲ワンポイント＆絆創膏中央の淡ピンクラベンダー)
+    "#E8B0DD",  # 27: C_PINK_SHOE (靴の甲ワンポイント＆淡ピンクアクセント)
+    "#EEEAE7",  # 28: C_LEG_SKIN (脚の落ち着いた肌トーン・よくん指定)
 ]
 
 (
@@ -84,6 +85,7 @@ PALETTE_HEX = [
     C_LAVENDER_GEM,
     C_EYE_SPARKLE,
     C_PINK_SHOE,
+    C_LEG_SKIN,
 ) = range(len(PALETTE_HEX))
 
 PARTS_DEF = [
@@ -268,7 +270,7 @@ def build_body_v4(vol: list, part: list) -> None:
                 set_vox(vol, part, hx_c + ox, 2, z_toe, C_HOODIE_HI, P_SHOES)
 
     # ==========================================================================
-    # 2. 解剖学的な両脚ライン（細い足首→ふくらはぎ→柔らかな太もも, y=4..13）
+    # 2. 解剖学的な両脚ライン（突起・膨らみ・謎模様ゼロのすっきりした生足, y=4..13）
     # ==========================================================================
     leg_rx_pts = [(4.0, 1.58), (6.0, 1.82), (8.0, 1.96), (10.5, 2.16), (13.0, 2.22)]
     leg_rz_pts = [(4.0, 1.72), (6.0, 1.96), (8.0, 2.08), (10.5, 2.25), (13.0, 2.30)]
@@ -288,129 +290,8 @@ def build_body_v4(vol: list, part: list) -> None:
                     nx = dx / rx_l
                     nz = dz / rz_l
                     if nx * nx + nz * nz <= 1.0:
-                        if side < 0:
-                            if y <= 8:
-                                if dz >= 0.35 and -1.2 <= dx <= -0.1:
-                                    col = C_HOODIE_HI if 5 <= y <= 7 else C_HOODIE
-                                elif dz >= -0.35:
-                                    col = C_HOODIE_SH
-                                else:
-                                    col = C_DARK
-                                set_vox(vol, part, x, y, z, col, P_SOCKS)
-                            else:
-                                col = C_SKIN_SH if (y >= 12 or dz < -0.5 or dx > 0.9) else C_SKIN
-                                set_vox(vol, part, x, y, z, col, P_SKIN)
-                        else:
-                            if y == 4:
-                                col = C_HOODIE_HI if dz > 0.2 else C_HOODIE_SH
-                                set_vox(vol, part, x, y, z, col, P_SOCKS)
-                            else:
-                                col = C_SKIN_SH if (y >= 12 or dz < -0.5 or dx < -0.9) else C_SKIN
-                                set_vox(vol, part, x, y, z, col, P_SKIN)
-
-    # 左脚ディテール: フリル帯(y=8) + 白レース上縁(y=9) + 外側黒リボン + ガーターストラップ(y=9..13) + 白十字(y=5..7)
-    lx_l = CX - leg_dx
-    for y_f in (8, 9):
-        rx_f = 2.42 if y_f == 8 else 2.38
-        rz_f = 2.52 if y_f == 8 else 2.48
-        for x in range(W):
-            if abs(x - CX) < 0.80:
-                continue
-            for z in range(D):
-                dx = x - lx_l
-                dz = z - CZ_BODY
-                ang = math.atan2(dz, dx)
-                scallop = 0.20 * math.cos(8.0 * ang)
-                rad = math.sqrt((dx / (rx_f + scallop)) ** 2 + (dz / (rz_f + scallop)) ** 2)
-                if 0.72 <= rad <= 1.0:
-                    if y_f == 9:
-                        if math.cos(8.0 * ang) > -0.1:
-                            set_vox(vol, part, x, y_f, z, C_WHITE_SH if dz < 0 else C_WHITE, P_SOCKS)
-                    else:
-                        set_vox(vol, part, x, y_f, z, C_HOODIE_HI if (dz > 0 and math.cos(8.0 * ang) > 0) else C_HOODIE_SH, P_SOCKS)
-
-    rib_x = int(round(lx_l - 2.4))
-    rib_z = int(round(CZ_BODY + 0.4))
-    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_DARK)):
-        set_vox(vol, part, rib_x, 8 + dy, rib_z, c_r, P_SOCKS)
-        set_vox(vol, part, rib_x, 8 + dy, rib_z - 1, C_DARK, P_SOCKS)
-        if dy == -1:
-            set_vox(vol, part, rib_x - 1, 8 + dy, rib_z, c_r, P_SOCKS)
-
-    # 左脚前面の細い黒ガーターストラップ (y=9..13) — 突起を作らず肌・レース表面へフラッシュ埋め込み
-    sx_l = int(round(lx_l))
-    for y_st in range(9, 14):
-        front_z = -1
-        for z in range(D - 1, -1, -1):
-            if vol[sx_l][y_st][z] != -1:
-                front_z = z
-                break
-        if front_z >= 0:
-            col_st = C_GRAY_HI if y_st == 9 else C_DARK
-            set_vox(vol, part, sx_l, y_st, front_z, col_st, P_SOCKS)
-            set_vox(vol, part, sx_l, y_st, front_z - 1, col_st, P_SOCKS)
-
-    for y_c in (5, 6, 7):
-        front_z = -1
-        for z in range(D - 1, -1, -1):
-            if vol[sx_l][y_c][z] != -1:
-                front_z = z
-                break
-        if front_z >= 0:
-            set_vox(vol, part, sx_l, y_c, front_z, C_WHITE, P_SOCKS)
-
-    # 右脚ディテール: 黒ガーターリング(y=6..7) + 外側リボン + 抽象化した3x3ばってん絆創膏(y=8..10)
-    lx_r = CX + leg_dx
-    for y_g in (6, 7):
-        rx_g = 2.38 if y_g == 7 else 2.32
-        rz_g = 2.48 if y_g == 7 else 2.42
-        for x in range(W):
-            if abs(x - CX) < 0.80:
-                continue
-            for z in range(D):
-                dx = x - lx_r
-                dz = z - CZ_BODY
-                rad = math.sqrt((dx / rx_g) ** 2 + (dz / rz_g) ** 2)
-                if 0.72 <= rad <= 1.0:
-                    if y_g == 6 and dz > -0.5 and int(round(abs(dx) + abs(dz))) % 2 == 0:
-                        set_vox(vol, part, x, y_g, z, C_WHITE_SH, P_SOCKS)
-                    elif y_g == 7:
-                        set_vox(vol, part, x, y_g, z, C_HOODIE_HI if dz > 0.3 else C_HOODIE_SH, P_SOCKS)
-                    else:
-                        set_vox(vol, part, x, y_g, z, C_HOODIE_SH if dz > -0.5 else C_DARK, P_SOCKS)
-
-    # ガーターリング前面銀金具（突起させずリング表面へフラッシュ埋め込み）
-    sx_r = int(round(lx_r))
-    for z in range(D - 1, -1, -1):
-        if vol[sx_r][7][z] != -1:
-            set_vox(vol, part, sx_r, 7, z, C_GRAY_HI, P_SOCKS)
-            set_vox(vol, part, sx_r, 7, z - 1, C_GRAY_HI, P_SOCKS)
-            break
-
-    rib_xr = int(round(lx_r + 2.4))
-    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_DARK)):
-        set_vox(vol, part, rib_xr, 7 + dy, rib_z, c_r, P_SOCKS)
-        set_vox(vol, part, rib_xr, 7 + dy, rib_z - 1, C_DARK, P_SOCKS)
-        if dy == -1:
-            set_vox(vol, part, rib_xr + 1, 7 + dy, rib_z, c_r, P_SOCKS)
-
-    # 右太ももの華奢な3x3ばってん絆創膏 (y=8..10) — 淡肌(#FDF8F3)に埋没しない白影(#D6D0E2)の4隅＋中央淡ピンク(#E8B0DD)でフラッシュ埋め込み
-    for y_b, ox, col_b in (
-        (10, -1, C_WHITE_SH),
-        (10, 1, C_WHITE_SH),
-        (9, 0, C_PINK_SHOE),
-        (8, -1, C_WHITE_SH),
-        (8, 1, C_WHITE_SH),
-    ):
-        vx = sx_r + ox
-        front_z = -1
-        for z in range(D - 1, int(CZ_BODY) - 1, -1):
-            if vol[vx][y_b][z] != -1:
-                front_z = z
-                break
-        if front_z >= 0:
-            set_vox(vol, part, vx, y_b, front_z, col_b, P_SOCKS)
-            set_vox(vol, part, vx, y_b, front_z - 1, col_b, P_SOCKS)
+                        # 解像度に対して破綻するフリル膨らみ・リボン突起・白線類を廃し、滑らかな生足(#EEEAE7)に統一
+                        set_vox(vol, part, x, y, z, C_LEG_SKIN, P_SKIN)
 
     # ==========================================================================
     # 3. プリーツミニスカート (y=11..14) — くびれウエストから可愛く広がる台形ミニ
@@ -458,6 +339,8 @@ def build_body_v4(vol: list, part: list) -> None:
             bust_x_mound = 0.42 * bust_y_env * math.exp(-((adx - 1.95) / 1.45) ** 2)
             rz_if_local = rz_if + bust_x_mound
             for z in range(D):
+                if y == 21 and z >= 25:
+                    continue  # バスト頂点(y=21)のz=25前面1段飛び出しを削り、z=24の滑らかな丸みへ揃える
                 dz = z - CZ_BODY
                 rz_i = rz_if_local if dz >= 0.0 else rz_ib
                 p_t = 2.40 if y >= 22 else 2.0
@@ -511,6 +394,8 @@ def build_body_v4(vol: list, part: list) -> None:
             bust_x_mound = 0.38 * bust_y_env * math.exp(-((adx - 2.15) / 1.55) ** 2)
             rz_bf_local = rz_bf + bust_x_mound
             for z in range(D):
+                if y == 21 and z >= 25:
+                    continue  # バスト頂点(y=21)のz=25前面1段飛び出しを削り、z=24の滑らかな丸みへ揃える
                 dz = z - CZ_BODY
                 rz_b = rz_bf_local if dz >= 0.0 else rz_bb
                 p_o = 2.40 if y >= 22 else 2.0

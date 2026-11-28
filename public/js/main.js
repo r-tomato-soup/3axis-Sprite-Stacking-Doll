@@ -39,11 +39,12 @@ function persistUiTheme(theme) {
 }
 
 const state = {
-  mode: 'tri',
+  // 細かい1px単位のディテールがピクセル化で潰れないよう、初期表示は3Dボクセル＋ピクセル化OFFにする
+  mode: 'voxel',
   shading: 35,
   outline: true,
   outlineWidth: 1.5,
-  pixelSnapSubdiv: 2,
+  pixelSnapSubdiv: 0,
   explode: 1.0,
   cutaway: 0,
   cutAxis: 'auto',

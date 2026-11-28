@@ -87,25 +87,25 @@
           </div>
 
           <div class="mode-cards" role="radiogroup" aria-label="レンダリングモード選択">
-            <button type="button" class="mode-card is-active" data-mode="tri" role="radio" aria-checked="true">
+            <button type="button" class="mode-card" data-mode="tri" role="radio" aria-checked="false">
               <div class="mode-card-head">
                 <span class="mode-index">MODE 1</span>
-                <span class="mode-badge recommended">標準</span>
+                <span class="mode-badge">3軸積層</span>
               </div>
               <div class="mode-title">全角度・3軸積層スプライト</div>
               <div class="mode-desc">視線ベクトルから X / Y / Z スライスを自動選択し2DスラブDDAで連続描画。</div>
             </button>
 
-            <button type="button" class="mode-card" data-mode="voxel" role="radio" aria-checked="false">
+            <button type="button" class="mode-card is-active" data-mode="voxel" role="radio" aria-checked="true">
               <div class="mode-card-head">
                 <span class="mode-index">MODE 2</span>
-                <span class="mode-badge">3Dメッシュ</span>
+                <span class="mode-badge recommended">標準</span>
               </div>
               <div class="mode-title">3Dピクセル・ボクセル</div>
               <div class="mode-desc">隣接面カリング済み3Dボックスメッシュを平行投影で描画。</div>
             </button>
 
-            <div id="voxel-subcontrols" class="mode-subbox" hidden>
+            <div id="voxel-subcontrols" class="mode-subbox">
               <div class="slider-block compact">
                 <div class="slider-header">
                   <label for="slider-shading">影のつよさ</label>
@@ -136,9 +136,9 @@
                 <span class="subbox-label">ピクセル化 (Pixel Snap)</span>
               </div>
               <div class="segmented-group full-width-seg snap-grid-4" role="group" aria-label="ピクセル化解像度">
-                <button type="button" class="seg-btn snap-mode-btn" data-snap="0">OFF</button>
+                <button type="button" class="seg-btn snap-mode-btn is-active" data-snap="0">OFF</button>
                 <button type="button" class="seg-btn snap-mode-btn" data-snap="3">3x</button>
-                <button type="button" class="seg-btn snap-mode-btn is-active" data-snap="2">2x</button>
+                <button type="button" class="seg-btn snap-mode-btn" data-snap="2">2x</button>
                 <button type="button" class="seg-btn snap-mode-btn" data-snap="1">1x</button>
               </div>
             </div>
@@ -205,12 +205,12 @@
           <canvas id="gl-canvas" aria-label="Character 2 3D ピクセルビューア"></canvas>
 
           <div class="hud-top-left">
-            <div id="hud-axis-pill" class="axis-pill" data-axis="z">
+            <div id="hud-axis-pill" class="axis-pill" data-axis="voxel">
               <span class="axis-dot"></span>
-              <span id="hud-axis-text">ACTIVE: Z-Stack (前後スライス)</span>
+              <span id="hud-axis-text">VOXEL MESH (影のつよさ 35%)</span>
             </div>
             <div id="hud-outline-pill" class="extra-pill">2D Outline 1.50</div>
-            <div id="hud-extra-pill" class="extra-pill">Pixel Snap 2x</div>
+            <div id="hud-extra-pill" class="extra-pill" hidden>Pixel Snap OFF</div>
             <div id="hud-paint-pill" class="extra-pill paint-pill" hidden>塗り直しモード ON</div>
           </div>
 
