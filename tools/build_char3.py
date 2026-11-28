@@ -1371,7 +1371,7 @@ def export_assets(vol_base: list, part_base: list, mods: list[dict], out_dir: st
         })
 
     model_data = {
-        "name": "黒髪パーカーちゃん",
+        "name": "ゆ",
         "size": {"x": W, "y": H, "z": D},
         "palette": PALETTE_HEX,
         "parts": parts,

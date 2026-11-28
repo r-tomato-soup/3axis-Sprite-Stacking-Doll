@@ -46,15 +46,15 @@
     },
     {
       "id": "char3",
-      "name": "黒髪パーカー",
-      "shortLabel": "黒髪パーカー",
+      "name": "ゆ",
+      "shortLabel": "ゆ",
       "defaultVersion": "char3_v1",
       "versions": [
         {
           "id": "char3_v1",
-          "label": "v1: 黒髪パーカー",
+          "label": "v1: ゆ",
           "shortLabel": "v1",
-          "description": "黒髪・パーカー・厚底靴の新キャラクター（髪型3種・ベレー帽対応）",
+          "description": "黒髪ハーフツイン・片方はだけパーカー・厚底靴（髪型3種・黒ベレー帽オプション対応）",
           "basePath": "./assets/char3/",
           "model": "./assets/char3/model.json"
         }
