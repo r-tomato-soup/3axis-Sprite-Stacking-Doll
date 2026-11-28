@@ -35,9 +35,9 @@ PALETTE_HEX = [
     "#F5D5DC",  # 7: C_BLUSH_LIGHT (淡チーク)
     "#E8B6C5",  # 8: C_BLUSH_DEEP (濃チーク)
     "#2E2737",  # 9: C_EYE_LASH (ジト目まつ毛バー)
-    "#574C6D",  # 10: C_EYE_HIGH (瞳上段スレート紫)
-    "#857AA1",  # 11: C_EYE_MID (瞳中段ラベンダー)
-    "#BBB2D3",  # 12: C_EYE_LOW (瞳下段淡ラベンダー・白ハイライトなし)
+    "#6B5F8E",  # 10: C_EYE_HIGH (瞳上段スレート紫・柔らかめ)
+    "#9B8ED0",  # 11: C_EYE_MID (瞳中段パステルラベンダー)
+    "#C8BFF2",  # 12: C_EYE_LOW (瞳下段明るめパステルラベンダー・白ハイライトなし)
     "#23212E",  # 13: C_DARK (パーカー深影・靴底・ガーターストラップ)
     "#323041",  # 14: C_HOODIE_SH (パーカー影・ニーハイ本体・厚底側面)
     "#454357",  # 15: C_HOODIE (パーカーベース・革靴ベース)
@@ -540,31 +540,7 @@ def build_core_body(vol: list, part: list) -> None:
                         set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
                         break
 
-    # 後ろフード（首後ろ〜背中にふわっと畳まれた立体パーカーフード y=26..34, z<CZ_BODY-3）
-    for y in range(26, 35):
-        t = (y - 26.0) / 8.0
-        rx_hd = 6.2 + 1.9 * math.sin(t * math.pi * 0.85)
-        rz_hd = 2.8 + 1.7 * math.sin(t * math.pi * 0.80)
-        cz_hd = CZ_BODY - 5.0 - 1.4 * math.sin(t * math.pi * 0.78)
-        for x in range(W):
-            for z in range(D):
-                dx = x - CX
-                dz = z - cz_hd
-                if dz > 2.2:
-                    continue
-                rad = math.sqrt((dx / rx_hd) ** 2 + (dz / rz_hd) ** 2)
-                if rad <= 1.0:
-                    if y in (32, 33) and rad > 0.70 and dz < 0.4:
-                        col = C_HOODIE_HI  # 後ろフード上縁のふんわり立ち上がりハイライト
-                    elif y == 28 and rad > 0.76 and dz < -0.2:
-                        col = C_HOODIE  # 下折り段の丸み
-                    elif y <= 27 or dz < -rz_hd * 0.68:
-                        col = C_DARK
-                    elif y in (29, 30) and dz < -0.4:
-                        col = C_DARK  # フード中央の折り目影
-                    else:
-                        col = C_HOODIE_SH
-                    set_vox(vol, part, x, y, z, col, P_OUTFIT)
+    # 後ろフードは側面で後ろ髪の飛び出しに見えやすいため配置せず、ボブ〜黒パーカー背面のすっきりしたシルエットを優先する
 
     # ==========================================================================
     # 5. 手元で布がダボッと丸く膨らんだ萌え袖両腕 (y=20..33)
@@ -634,14 +610,17 @@ def build_core_body(vol: list, part: list) -> None:
         (53.0, 7.6),
         (54.0, 4.4),
     ]
+    # 側面でおでこ〜前髪が絶壁にもひさし状にもならないよう、char2標本準拠の丸みドーム曲線にする
     rz_front_pts = [
         (35.0, 6.2),
         (37.0, 7.8),
         (40.0, 8.6),
-        (44.5, 8.7),
-        (49.0, 8.2),
-        (52.0, 6.4),
-        (54.0, 3.4),
+        (44.0, 8.9),
+        (47.5, 8.9),
+        (50.5, 8.3),
+        (52.5, 6.9),
+        (53.5, 5.2),
+        (54.0, 3.6),
     ]
     rz_back_pts = [
         (35.0, 6.8),
@@ -678,11 +657,11 @@ def build_core_body(vol: list, part: list) -> None:
                     if is_face:
                         if y == 35:
                             col = C_SKIN_SH  # もちっと顎下の柔らか影
-                        elif y == 37 and 6.2 <= adx <= 8.8 and r_ell >= 0.72:
-                            col = C_BLUSH_DEEP if (6.8 <= adx <= 8.2) else C_BLUSH_LIGHT
-                        elif y == 36 and 6.5 <= adx <= 8.5 and r_ell >= 0.80:
+                        elif y == 37 and 6.8 <= adx <= 9.2 and r_ell >= 0.72:
+                            col = C_BLUSH_DEEP if (7.2 <= adx <= 8.6) else C_BLUSH_LIGHT
+                        elif y == 36 and 7.0 <= adx <= 9.0 and r_ell >= 0.80:
                             col = C_BLUSH_LIGHT
-                        elif r_ell >= 0.88 and adx >= 7.8:
+                        elif r_ell >= 0.88 and adx >= 8.2:
                             col = C_SKIN_SH
                         else:
                             col = C_SKIN
@@ -724,49 +703,67 @@ def build_core_body(vol: list, part: list) -> None:
                     col = C_HAIR_SH2 if (y <= 33 or int(round(abs(dx))) in (0, 4, 8)) else C_HAIR_SH1
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
-    # 柔らかいジト目 (y=38..41, 表面から3vox奥まで埋めて斜め縦割れを完全防止！白ハイライトなし)
+    # 大きめデフォルメ・たれ目寄りジト目 (y=37..41, 幅6vox, 表面から3vox+隣接Z段差埋め込みで斜め縦割れ防止・白点ハイライトなし)
     for side in (-1.0, 1.0):
-        # 左目 x=21..24, 右目 x=33..36（目幅4vox、目間8voxで幼く可愛いバランス）
-        ex_range = range(21, 25) if side < 0 else range(33, 37)
-        outer_x = 21 if side < 0 else 36
-        for x in ex_range:
-            for y in range(38, 42):
-                # 表面Z探索
+        # 左目 x=20..25 (local_u=0が外目尻..5が内目頭), 右目 x=37..32 (対称)
+        ex_list = list(range(20, 26)) if side < 0 else list(range(37, 31, -1))
+        for y in range(37, 42):
+            z_surfs: dict[int, int] = {}
+            for x in ex_list:
                 front_z = -1
                 for z in range(D - 1, int(CZ_HEAD), -1):
                     if vol[x][y][z] != -1 and part[x][y][z] == P_SKIN:
                         front_z = z
                         break
-                if front_z >= 0:
-                    if y == 41:
-                        col_e = C_EYE_LASH
-                    elif y == 40:
-                        col_e = C_EYE_LASH if x == outer_x else C_EYE_HIGH
-                    elif y == 39:
-                        col_e = C_EYE_MID
-                    else:
-                        col_e = C_EYE_LOW
-                    for depth in range(3):
-                        set_vox(vol, part, x, y, front_z - depth, col_e, P_EYES)
+                z_surfs[x] = front_z
 
-    # 重めレイヤー前髪（目の上に空気感の肌見せ隙間＋縦毛束割れ影） (y=41..53)
+            for local_u, x in enumerate(ex_list):
+                front_z = z_surfs[x]
+                if front_z < 0:
+                    continue
+                col_e: int | None = None
+                if y == 41:
+                    # 上まつ毛バーは外目尻(u=0)を1段下げて柔らかなタレ目ラインにする
+                    if local_u >= 1:
+                        col_e = C_EYE_LASH
+                elif y == 40:
+                    col_e = C_EYE_LASH if local_u == 0 else C_EYE_HIGH
+                elif y == 39:
+                    col_e = C_EYE_HIGH if local_u == 0 else C_EYE_MID
+                elif y == 38:
+                    if local_u >= 1:
+                        col_e = C_EYE_LOW
+                else:
+                    # y=37: 下まぶた中央を丸く膨らませて幼いデフォルメ瞳にする
+                    if 2 <= local_u <= 4:
+                        col_e = C_EYE_LOW
+
+                if col_e is None:
+                    continue
+                neigh_z = [z_surfs[nx] for nx in (x - 1, x + 1) if nx in z_surfs and z_surfs[nx] >= 0]
+                fill_min_z = max(int(CZ_HEAD) + 2, min([front_z - 2] + neigh_z))
+                for z_fill in range(fill_min_z, front_z + 1):
+                    set_vox(vol, part, x, y, z_fill, col_e, P_EYES)
+
+    # ふっくら丸み前髪（中央重め束を1〜2vox切り上げて抜け感を出し、側面おでこカーブを滑らかに丸める） (y=41..53)
     for y in range(41, 54):
         fy = float(y)
         rx_h = interp_profile(rx_head_pts, fy) + 0.30 * smoothstep(41.0, 47.0, fy)
         rz_f = interp_profile(rz_front_pts, fy)
-        # 斜め3/4角度で目を覆いすぎないよう前髪厚みは程よいカーブに抑える
-        bang_extra_z = 0.38 + 0.62 * smoothstep(41.0, 47.0, fy) * (1.0 - 0.65 * smoothstep(50.0, 54.0, fy))
+        # 額上部(y=46..49)をピークに緩やかに張り出すドーム曲線で、側面シルエットをchar2風の丸いおでこにする
+        bang_arch = smoothstep(40.5, 46.5, fy) * (1.0 - 0.65 * smoothstep(50.0, 53.8, fy))
+        bang_extra_z = 0.35 + 0.95 * bang_arch
         for x in range(W):
             dx = x - CX
             adx = abs(dx)
             if adx > 11.4:
                 continue
-            # 目の上の肌見せ隙間（水平パッツンを避ける可愛い束感！）
-            if y == 41 and (adx > 2.2 and adx < 8.4):
+            # y=41は目・眉間上を全て開け、y=42も中央の重い毛束をスッキリ切り上げてデフォルメ瞳を引き立てる
+            if y == 41 and adx < 8.8:
                 continue
-            if y == 42 and (2.0 <= adx <= 3.1 or 5.2 <= adx <= 6.4):
+            if y == 42 and (adx <= 3.1 or (-6.4 <= dx <= -5.2)):
                 continue
-            if y == 43 and (2.2 <= adx <= 2.9 or 5.5 <= adx <= 6.2):
+            if y == 43 and ((1.8 <= adx <= 3.1) or (-6.2 <= dx <= -5.4)):
                 continue
             for z in range(int(CZ_HEAD + 2), D):
                 dz = z - CZ_HEAD
@@ -1067,12 +1064,13 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
     """
     beret_map: dict[tuple[int, int, int], tuple[int, int]] = {}
     cx_b = CX - 1.0
-    cz_b = CZ_HEAD - 2.0
+    # 丸く張り出したおでこドームを前面縁からしっかり包むよう中心Zと奥行半径をわずかに前寄りへ合わせる
+    cz_b = CZ_HEAD - 1.4
 
     for x in range(W):
         for z in range(D):
             ux = (x - cx_b) / 14.6
-            uz = (z - cz_b) / 13.6
+            uz = (z - cz_b) / 14.0
             r2 = ux * ux + uz * uz
             if r2 > 1.02:
                 continue
