@@ -52,6 +52,7 @@ PALETTE_HEX = [
     "#E8AEC2",  # 24: C_PINK_BAND (白絆創膏の中央ピンクガーゼ)
     "#C49EDE",  # 25: C_LAVENDER_GEM (ツインテリボン中央の淡紫ハート宝石)
     "#FFFFFF",  # 26: C_EYE_SPARKLE (瞳純白ハイライト・Char2準拠)
+    "#E8B0DD",  # 27: C_PINK_SHOE (靴の甲ワンポイント＆絆創膏中央の淡ピンクラベンダー)
 ]
 
 (
@@ -82,6 +83,7 @@ PALETTE_HEX = [
     C_PINK_BAND,
     C_LAVENDER_GEM,
     C_EYE_SPARKLE,
+    C_PINK_SHOE,
 ) = range(len(PALETTE_HEX))
 
 PARTS_DEF = [
@@ -184,7 +186,7 @@ def build_body_v4(vol: list, part: list) -> None:
     - 太もも→ふくらはぎ→細い足首→フラット厚底靴の自然な脚ライン＋低め腰バランス
     """
     # ==========================================================================
-    # 1. コンパクト厚底プラットフォームゴス靴 (y=0..3) — 細い足首とメリハリが出るフラット接地靴
+    # 1. コンパクト厚底プラットフォームゴス靴 (y=0..3) — よくん指定の白×ピンク(#E8B0DD)デザイン＋つま先+1px(z=25)
     # ==========================================================================
     leg_dx = 3.25
     for side in (-1.0, 1.0):
@@ -192,7 +194,7 @@ def build_body_v4(vol: list, part: list) -> None:
         for y in range(0, 4):
             if y <= 1:
                 rx_s = 2.55
-                rz_f = 3.85
+                rz_f = 4.65  # つま先を前へ+1マス(z=25)伸ばして甲デザインとのバランスを整える
                 rz_b = 2.65
                 cz_s = CZ_BODY + 0.60
                 for x in range(W):
@@ -209,11 +211,12 @@ def build_body_v4(vol: list, part: list) -> None:
                             if y == 0:
                                 col = C_DARK
                             else:
-                                col = C_HOODIE_HI if (d_s > 0.78 and dz > -1.8) else C_HOODIE_SH
+                                # ソール前面中央は落ち着いた靴影(C_HOODIE_SH)、左右エッジに立体ハイライト(C_HOODIE_HI)
+                                col = C_HOODIE_HI if (abs(dx) >= 1.8 and dz > -1.8) else C_HOODIE_SH
                             set_vox(vol, part, x, y, z, col, P_SHOES)
             elif y == 2:
                 rx_u = 2.38
-                rz_f = 3.40
+                rz_f = 4.35  # 甲のつま先も+1マス(z=25)まで前へ伸ばす
                 rz_b = 2.45
                 cz_s = CZ_BODY + 0.42
                 for x in range(W):
@@ -227,7 +230,9 @@ def build_body_v4(vol: list, part: list) -> None:
                         nz = abs(dz) / rz
                         d_u = (nx ** 2.8 + nz ** 2.8) ** (1.0 / 2.8)
                         if d_u <= 1.0:
-                            if dz > 0.8 and (-1.3 <= dx <= 0.4):
+                            if z >= 24:
+                                col = C_HOODIE_HI  # つま先甲面(z=24..25)をすっきりしたダークグレー明部で統一
+                            elif dz > 0.8 and (-1.3 <= dx <= 0.4):
                                 col = C_HOODIE_SPEC
                             elif dz > 0.1:
                                 col = C_HOODIE
@@ -248,23 +253,19 @@ def build_body_v4(vol: list, part: list) -> None:
                             col = C_HOODIE_HI if z >= cz_a + 0.45 else C_HOODIE_SH
                             set_vox(vol, part, x, y, z, col, P_SHOES)
 
-        # 銀ハートバックル (y=1..3) — 突起が出ないよう表面フラッシュ埋め込み(front_z / front_z-1)にする
+        # 靴甲デザイン（よくんJSON厳密準拠: y=3 z=21..22 に左右銀金具、y=2 z=23 に 白 | 淡ピンク(#E8B0DD) | 白）
         hx_c = int(round(lx))
-        for y_h, offsets in (
-            (3, [(-1, C_GRAY_HI), (1, C_GRAY_HI)]),
-            (2, [(-1, C_WHITE), (0, C_GRAY), (1, C_WHITE)]),
-            (1, [(0, C_GRAY_HI)]),
-        ):
-            for ox, c_h in offsets:
-                vx = hx_c + ox
-                front_z = -1
-                for z in range(D - 1, -1, -1):
-                    if vol[vx][y_h][z] != -1:
-                        front_z = z
-                        break
-                if front_z >= 0:
-                    set_vox(vol, part, vx, y_h, front_z, c_h, P_SHOES)
-                    set_vox(vol, part, vx, y_h, front_z - 1, c_h, P_SHOES)
+        for ox, c_top in ((-1, C_GRAY_HI), (1, C_GRAY_HI)):
+            vx = hx_c + ox
+            set_vox(vol, part, vx, 3, 22, c_top, P_SHOES)
+            set_vox(vol, part, vx, 3, 21, c_top, P_SHOES)
+        for ox, c_mid in ((-1, C_WHITE), (0, C_PINK_SHOE), (1, C_WHITE)):
+            vx = hx_c + ox
+            set_vox(vol, part, vx, 2, 23, c_mid, P_SHOES)
+        # つま先甲面(y=2, z=24..25)の中央3列をクリーンな C_HOODIE_HI で揃え、ソール前縁と一体化する
+        for z_toe in (24, 25):
+            for ox in (-1, 0, 1):
+                set_vox(vol, part, hx_c + ox, 2, z_toe, C_HOODIE_HI, P_SHOES)
 
     # ==========================================================================
     # 2. 解剖学的な両脚ライン（細い足首→ふくらはぎ→柔らかな太もも, y=4..13）
@@ -393,11 +394,11 @@ def build_body_v4(vol: list, part: list) -> None:
         if dy == -1:
             set_vox(vol, part, rib_xr + 1, 7 + dy, rib_z, c_r, P_SOCKS)
 
-    # 右太ももの華奢な3x3ばってん絆創膏 (y=8..10) — 淡肌(#FDF8F3)に埋没しない白影(#D6D0E2)の4隅＋中央ピンクでフラッシュ埋め込み
+    # 右太ももの華奢な3x3ばってん絆創膏 (y=8..10) — 淡肌(#FDF8F3)に埋没しない白影(#D6D0E2)の4隅＋中央淡ピンク(#E8B0DD)でフラッシュ埋め込み
     for y_b, ox, col_b in (
         (10, -1, C_WHITE_SH),
         (10, 1, C_WHITE_SH),
-        (9, 0, C_PINK_BAND),
+        (9, 0, C_PINK_SHOE),
         (8, -1, C_WHITE_SH),
         (8, 1, C_WHITE_SH),
     ):
