@@ -1100,6 +1100,12 @@ function toggleMod(modId) {
   const nextOn = !activeSet.has(modId);
   if (nextOn) {
     activeSet.add(modId);
+    // 髪型のような排他選択はチェックボックスではなく自動OFFで表現する（group 未指定のモッズには影響させない）
+    if (mod.group) {
+      loadedAsset.mods.forEach((m) => {
+        if (m.id !== modId && m.group === mod.group) activeSet.delete(m.id);
+      });
+    }
   } else {
     activeSet.delete(modId);
   }

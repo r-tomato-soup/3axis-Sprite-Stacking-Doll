@@ -77,6 +77,7 @@ function normalizeModsList(rawMods) {
       offsetWhen: m.offsetWhen && typeof m.offsetWhen === 'object' ? m.offsetWhen : null,
       remove: Array.isArray(m.remove) ? m.remove : [],
       add: Array.isArray(m.add) ? m.add : [],
+      group: m.group ? String(m.group) : null,
     }));
 }
 
