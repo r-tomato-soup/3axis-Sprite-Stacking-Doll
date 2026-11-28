@@ -65,6 +65,7 @@ const state = {
   paintColor: '#F48FB1',
   paletteCategory: 'hair',
   panelsCollapsed: false,
+  floatingOptionsOpen: false,
   mobileSheetOpen: false,
   mobileSheetTab: 'display',
 };
@@ -140,6 +141,10 @@ const dom = {
   toggleGrid: document.getElementById('toggle-grid'),
   btnCollapseAll: document.getElementById('btn-collapse-all'),
   floatingOptionsBar: document.getElementById('floating-options-bar'),
+  floatingOptionsList: document.getElementById('floating-options-list'),
+  floatingOptionsClose: document.getElementById('floating-options-close'),
+  floatingOptionsToggle: document.getElementById('floating-options-toggle'),
+  floatingOptionsBadge: document.getElementById('floating-options-badge'),
   floatingAutoSpin: document.getElementById('floating-autospin'),
   floatingColorFab: document.getElementById('floating-color-fab'),
   floatingOpenMenu: document.getElementById('floating-open-menu'),
@@ -409,9 +414,24 @@ function setAutoSpin(enabled) {
   syncAutoSpinUi();
 }
 
+function setFloatingOptionsOpen(open) {
+  const hasMods = Array.isArray(loadedAsset?.mods) && loadedAsset.mods.length > 0;
+  const wantOpen = Boolean(open) && hasMods;
+  state.floatingOptionsOpen = wantOpen;
+  if (dom.floatingOptionsBar) {
+    dom.floatingOptionsBar.hidden = !wantOpen;
+  }
+  if (dom.floatingOptionsToggle) {
+    dom.floatingOptionsToggle.setAttribute('aria-expanded', String(wantOpen));
+  }
+}
+
 function setMiniPaletteOpen(open) {
   const wantOpen = Boolean(open) && !mobileMediaQuery.matches;
   state.miniPaletteOpen = wantOpen;
+  if (wantOpen && state.floatingOptionsOpen) {
+    setFloatingOptionsOpen(false);
+  }
   dom.floatingColorFab.setAttribute('aria-expanded', String(wantOpen));
 
   if (wantOpen) {
@@ -430,8 +450,9 @@ function setMiniPaletteOpen(open) {
 
 function setPanelsCollapsed(collapsed) {
   state.panelsCollapsed = Boolean(collapsed);
-  if (!state.panelsCollapsed && state.miniPaletteOpen) {
-    setMiniPaletteOpen(false);
+  if (!state.panelsCollapsed) {
+    if (state.miniPaletteOpen) setMiniPaletteOpen(false);
+    if (state.floatingOptionsOpen) setFloatingOptionsOpen(false);
   }
   document.body.classList.toggle('panels-collapsed', state.panelsCollapsed);
   dom.floatingOpenMenu.textContent = mobileMediaQuery.matches ? 'メニュー' : 'メニューを開く';
@@ -453,6 +474,9 @@ function setMobileSheetTab(tabKey) {
 
 function setMobileSheetOpen(open) {
   const nextOpen = Boolean(open) && mobileMediaQuery.matches;
+  if (nextOpen && state.floatingOptionsOpen) {
+    setFloatingOptionsOpen(false);
+  }
   state.mobileSheetOpen = nextOpen;
   document.body.classList.toggle('mobile-sheet-open', nextOpen);
 
@@ -1029,10 +1053,17 @@ function renderModsBar() {
   if (mods.length === 0) {
     dom.slotMods.hidden = true;
     dom.modsChipBar.innerHTML = '';
-    if (dom.floatingOptionsBar) {
-      dom.floatingOptionsBar.hidden = true;
-      dom.floatingOptionsBar.innerHTML = '';
+    if (dom.floatingOptionsList) {
+      dom.floatingOptionsList.innerHTML = '';
     }
+    if (dom.floatingOptionsToggle) {
+      dom.floatingOptionsToggle.hidden = true;
+      dom.floatingOptionsToggle.classList.remove('has-active');
+    }
+    if (dom.floatingOptionsBadge) {
+      dom.floatingOptionsBadge.hidden = true;
+    }
+    setFloatingOptionsOpen(false);
     return;
   }
 
@@ -1041,16 +1072,25 @@ function renderModsBar() {
   const activeCount = mods.filter((m) => activeSet.has(m.id)).length;
   dom.modsCountBadge.textContent = `${activeCount} / ${mods.length} ON`;
   dom.modsChipBar.innerHTML = '';
-  if (dom.floatingOptionsBar) {
-    dom.floatingOptionsBar.hidden = false;
-    dom.floatingOptionsBar.innerHTML = '';
+
+  if (dom.floatingOptionsToggle) {
+    dom.floatingOptionsToggle.hidden = false;
+    dom.floatingOptionsToggle.classList.toggle('has-active', activeCount > 0);
+  }
+  if (dom.floatingOptionsBadge) {
+    dom.floatingOptionsBadge.hidden = activeCount === 0;
+    dom.floatingOptionsBadge.textContent = String(activeCount);
+  }
+  if (dom.floatingOptionsList) {
+    dom.floatingOptionsList.innerHTML = '';
+    dom.floatingOptionsList.classList.toggle('is-compact-row', mods.length <= 2);
   }
 
   mods.forEach((mod) => {
     const isOn = activeSet.has(mod.id);
     dom.modsChipBar.appendChild(createOptionChipButton(mod, isOn));
-    if (dom.floatingOptionsBar) {
-      dom.floatingOptionsBar.appendChild(createOptionChipButton(mod, isOn, 'floating-opt-chip'));
+    if (dom.floatingOptionsList) {
+      dom.floatingOptionsList.appendChild(createOptionChipButton(mod, isOn, 'floating-opt-chip'));
     }
   });
 }
@@ -1503,6 +1543,18 @@ function bindEvents() {
 
   dom.toggleAutoSpin.addEventListener('click', () => setAutoSpin(!camera.autoSpin));
   dom.floatingAutoSpin.addEventListener('click', () => setAutoSpin(!camera.autoSpin));
+  dom.floatingOptionsToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setFloatingOptionsOpen(!state.floatingOptionsOpen);
+  });
+  dom.floatingOptionsClose?.addEventListener('click', () => setFloatingOptionsOpen(false));
+  document.addEventListener('pointerdown', (e) => {
+    if (!state.floatingOptionsOpen) return;
+    if (dom.floatingOptionsBar?.contains(e.target) || dom.floatingOptionsToggle?.contains(e.target)) {
+      return;
+    }
+    setFloatingOptionsOpen(false);
+  });
 
   dom.btnCollapseAll.addEventListener('click', () => setPanelsCollapsed(true));
   dom.floatingColorFab.addEventListener('click', () => {
@@ -1642,6 +1694,7 @@ function bindEvents() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!dom.stripModal.hidden) setModalOpen(false);
+      else if (state.floatingOptionsOpen) setFloatingOptionsOpen(false);
       else if (state.mobileSheetOpen) setMobileSheetOpen(false);
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && state.paintMode) {
@@ -1800,6 +1853,7 @@ async function init() {
     getPartCategories: () => getPartCategoriesSummary(),
     setColorHex: (hex) => setPaintColor(hex),
     setMiniPaletteOpen: (open) => setMiniPaletteOpen(open),
+    setFloatingOptionsOpen: (open) => setFloatingOptionsOpen(open),
     addCustomColorToActiveCategory: (hex) => addCustomColorToActiveCategory(hex ?? state.paintColor),
     removeCustomColorFromActiveCategory: (hex) => removeCustomColorFromActiveCategory(hex),
     setAutoSpin: (enabled) => setAutoSpin(enabled),

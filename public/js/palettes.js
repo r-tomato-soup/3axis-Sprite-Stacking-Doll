@@ -12,6 +12,11 @@ const CHARACTER_PART_GROUPS = {
     { id: 'face', label: '顔', partIds: ['skin', 'eyes'] },
     { id: 'outfit', label: '服', partIds: ['outfit', 'ribbon', 'cat_ears', 'shoes'] },
   ],
+  char3: [
+    { id: 'hair', label: '髪', partIds: ['hair'] },
+    { id: 'face', label: '顔', partIds: ['skin', 'eyes'] },
+    { id: 'outfit', label: '服', partIds: ['outfit', 'socks', 'shoes', 'accessories', 'beret'] },
+  ],
   bunny: [
     { id: 'body_ears', label: '体・耳', partIds: ['body', 'ears'] },
     { id: 'face', label: '顔', partIds: ['face'] },

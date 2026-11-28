@@ -2,7 +2,7 @@
 新キャラクター（黒髪ハーフツイン×片方はだけ黒パーカー萌え袖×左右非対称ニーハイ＆白絆創膏×厚底靴）
 3Dボクセル・3軸スライス・拡張Modジェネレーター
 
-- グリッド: 58 x 64 x 42（最大ストリップ幅 64*58=3712 <= 4096、モバイルWebGL2安全圏）
+- グリッド: 58 x 56 x 42（最大ストリップ幅 56*58=3248 <= 4096、モバイルWebGL2安全圏）
 - ベース: 下向きショート・ハーフツイン + アホ毛 + ばってん＆白うさぎヘアピン + フラット接地厚底靴
 - 拡張Mods:
   - beret (黒ベレー帽: 斜め深め被り、アホ毛と差し替え、全髪型と組み合わせ可能)
@@ -21,7 +21,7 @@ from PIL import Image
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(PROJECT_ROOT, "public", "assets", "char3")
 
-W, H, D = 58, 64, 42
+W, H, D = 58, 56, 42
 
 # 二次元リッチな色相シフトパレット（外周黒枠は焼き込まず後加工2Dアウトラインへ委譲）
 PALETTE_HEX = [
@@ -179,18 +179,18 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
     """ベース本体を構築する。bangs_style='char2' でv2(Char2完全1:1)、'yu_mix' でv3(Char2顔×黒髪前髪ニュアンス)を生成。"""
 
     # ==========================================================================
-    # 1. 厚底プラットフォームゴス靴 (y=0..7) — ソール底面を丸めずフラット接地！
+    # 1. 厚底プラットフォームゴス靴 (y=0..4) — キャラ2基準のちび等身に合わせてコンパクト化＋フラット接地維持
     # ==========================================================================
-    leg_dx = 4.6
+    leg_dx = 4.35
     for side in (-1.0, 1.0):
         lx = CX + side * leg_dx
-        for y in range(0, 8):
-            if y <= 2:
-                # プラットフォームソール: スーパー楕円(p=4.2)で靴底に丸みのないフラット＆シャキッとした接地形状
-                rx_s = 3.55
-                rz_f = 4.95  # つま先側が前にしっかり出る
-                rz_b = 3.55  # かかと側が真っ直ぐ垂直に落ちる
-                cz_s = CZ_BODY + 0.85
+        for y in range(0, 5):
+            if y <= 1:
+                # プラットフォームソール (2vox厚): スーパー楕円(p=4.2)で靴底に丸みのないフラット＆シャキッとした接地形状
+                rx_s = 3.35
+                rz_f = 4.65  # つま先側が前にしっかり出る
+                rz_b = 3.35  # かかと側が真っ直ぐ垂直に落ちる
+                cz_s = CZ_BODY + 0.75
                 for x in range(W):
                     if abs(x - CX) < 0.85:
                         continue
@@ -200,24 +200,21 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         rz = rz_f if dz >= 0 else rz_b
                         nx = abs(dx) / rx_s
                         nz = abs(dz) / rz
-                        # p=4.2 の角張りスーパー楕円で通常の靴ソールらしいフラットな箱形シルエットを作る
                         d_s = (nx ** 4.2 + nz ** 4.2) ** (1.0 / 4.2)
                         if d_s <= 1.0:
                             if y == 0:
                                 col = C_DARK
-                            elif y == 1:
-                                col = C_DARK if d_s > 0.86 else C_HOODIE_SH
                             else:
                                 # ソール上縁の立体エッジハイライト
-                                col = C_HOODIE_HI if (d_s > 0.80 and dz > -2.5) else C_HOODIE_SH
+                                col = C_HOODIE_HI if (d_s > 0.80 and dz > -2.3) else C_HOODIE_SH
                             set_vox(vol, part, x, y, z, col, P_SHOES)
-            elif y <= 5:
-                # 靴甲 (y=3..5): つま先に向けて滑らかにカーブ＋エナメル艶＋前面に大きめ銀ハートバックル
-                t = (y - 3.0) / 2.0
-                rx_u = 3.35 - 0.25 * t
-                rz_f = 4.70 - 0.75 * t
-                rz_b = 3.35 - 0.15 * t
-                cz_s = CZ_BODY + 0.75 - 0.25 * t
+            elif y <= 3:
+                # 靴甲 (y=2..3): つま先に向けて滑らかにカーブ＋エナメル艶＋前面に大きめ銀ハートバックル
+                t = float(y - 2)
+                rx_u = 3.15 - 0.18 * t
+                rz_f = 4.35 - 0.65 * t
+                rz_b = 3.15 - 0.12 * t
+                cz_s = CZ_BODY + 0.65 - 0.25 * t
                 for x in range(W):
                     if abs(x - CX) < 0.85:
                         continue
@@ -229,7 +226,7 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         nz = abs(dz) / rz
                         d_u = (nx ** 2.8 + nz ** 2.8) ** (1.0 / 2.8)
                         if d_u <= 1.0:
-                            if y == 4 and dz > 1.2 and (-2.0 <= dx <= 0.6):
+                            if y == 3 and dz > 1.0 and (-1.8 <= dx <= 0.6):
                                 col = C_HOODIE_SPEC  # エナメル革靴ツヤ
                             elif dz > 0.2:
                                 col = C_HOODIE
@@ -237,9 +234,9 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                                 col = C_HOODIE_SH
                             set_vox(vol, part, x, y, z, col, P_SHOES)
             else:
-                # 足首ベルト＆履き口 (y=6..7)
-                rx_a = 3.10 if y == 6 else 2.95
-                rz_a = 3.25 if y == 6 else 3.05
+                # 足首ベルト＆履き口 (y=4)
+                rx_a = 2.90
+                rz_a = 3.05
                 cz_a = CZ_BODY + 0.20
                 for x in range(W):
                     if abs(x - CX) < 0.90:
@@ -248,20 +245,19 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         nx = (x - lx) / rx_a
                         nz = (z - cz_a) / rz_a
                         if nx * nx + nz * nz <= 1.0:
-                            col = C_HOODIE_HI if (y == 6 and z >= cz_a + 0.6) else C_HOODIE_SH
+                            col = C_HOODIE_HI if z >= cz_a + 0.6 else C_HOODIE_SH
                             set_vox(vol, part, x, y, z, col, P_SHOES)
 
-        # 靴の銀金具（大きめ甲ハートバックル y=3..5 + 足首ベルト銀バックル y=6..7）
+        # 靴の銀金具（甲ハートバックル y=2..4）
         # 表面から2vox奥まで埋めて斜め角度でも途切れないようにする
         hx_c = int(round(lx))
         for y_h, offsets in (
-            (5, [(-1, C_GRAY_HI), (1, C_GRAY_HI)]),
-            (4, [(-1, C_WHITE), (0, C_GRAY), (1, C_WHITE)]),
-            (3, [(0, C_GRAY_HI)]),
+            (4, [(-1, C_GRAY_HI), (1, C_GRAY_HI)]),
+            (3, [(-1, C_WHITE), (0, C_GRAY), (1, C_WHITE)]),
+            (2, [(0, C_GRAY_HI)]),
         ):
             for ox, c_h in offsets:
                 vx = hx_c + ox
-                # 前面表面Zを探して塗り込み＋1vox手前へ立体レリーフ
                 front_z = -1
                 for z in range(D - 1, -1, -1):
                     if vol[vx][y_h][z] != -1:
@@ -270,35 +266,22 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 if front_z >= 0:
                     set_vox(vol, part, vx, y_h, front_z, c_h, P_SHOES)
                     set_vox(vol, part, vx, y_h, front_z - 1, c_h, P_SHOES)
-                    if ox != 0 or y_h == 3:
+                    if ox != 0 or y_h == 2:
                         set_vox(vol, part, vx, y_h, front_z + 1, c_h, P_SHOES)
-        # 足首ストラップ銀バックル (y=6..7)
-        for y_b in (6, 7):
-            for ox in (0, 1 if side < 0 else -1):
-                vx = hx_c + ox
-                front_z = -1
-                for z in range(D - 1, -1, -1):
-                    if vol[vx][y_b][z] != -1:
-                        front_z = z
-                        break
-                if front_z >= 0:
-                    c_b = C_GRAY_HI if y_b == 7 else C_GRAY
-                    set_vox(vol, part, vx, y_b, front_z, c_b, P_SHOES)
-                    set_vox(vol, part, vx, y_b, front_z + 1, c_b, P_SHOES)
 
     # ==========================================================================
-    # 2. 両脚・左右非対称ニーハイ＆フリル・ガーターベルト・白い可愛い絆創膏 (y=8..22)
+    # 2. 両脚・左右非対称ニーハイ＆フリル・ガーターベルト・白い可愛い絆創膏 (y=5..15)
+    #    スカート裾(y=13)下の露出脚は8vox、靴込み13voxでキャラ2準拠のちびバランスに収める
     # ==========================================================================
-    for y in range(8, 23):
+    for y in range(5, 16):
         for side in (-1.0, 1.0):
             lx = CX + side * leg_dx
-            # ふくらはぎ〜太ももへごく緩やかに太くなる可愛い脚ライン
-            t_leg = (y - 8.0) / 14.0
-            rx_l = 2.45 + 0.35 * smoothstep(0.25, 0.90, t_leg)
-            rz_l = 2.60 + 0.35 * smoothstep(0.25, 0.90, t_leg)
+            t_leg = (y - 5.0) / 10.0
+            rx_l = 2.30 + 0.30 * smoothstep(0.20, 0.90, t_leg)
+            rz_l = 2.45 + 0.30 * smoothstep(0.20, 0.90, t_leg)
 
             for x in range(W):
-                if abs(x - CX) < 1.35:
+                if abs(x - CX) < 1.25:
                     continue
                 for z in range(D):
                     dx = x - lx
@@ -309,10 +292,10 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     if r2 <= 1.0:
                         is_left_view = side < 0  # 向かって左脚＝黒ニーハイ＋ガーターストラップ
                         if is_left_view:
-                            if y <= 16:
+                            if y <= 9:
                                 # 黒ニーハイ本体（前面左寄りに光沢縦ハイライト）
-                                if dz >= 0.4 and -1.6 <= dx <= -0.1:
-                                    col = C_HOODIE_HI if 11 <= y <= 14 else C_HOODIE
+                                if dz >= 0.4 and -1.5 <= dx <= -0.1:
+                                    col = C_HOODIE_HI if 6 <= y <= 8 else C_HOODIE
                                 elif dz >= -0.4:
                                     col = C_HOODIE_SH
                                 else:
@@ -320,23 +303,22 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                                 set_vox(vol, part, x, y, z, col, P_SOCKS)
                             else:
                                 # 色白太もも
-                                col = C_SKIN_SH if (y >= 21 or dz < -0.6 or dx > 1.2) else C_SKIN
+                                col = C_SKIN_SH if (y >= 14 or dz < -0.6 or dx > 1.1) else C_SKIN
                                 set_vox(vol, part, x, y, z, col, P_SKIN)
                         else:
-                            # 向かって右脚（キャラ左脚）: 下黒ソックス(y=8..9) + 絶対領域白肌 + ガーターリング(y=12..14) + 白太もも＋白絆創膏(y=16..19)
-                            if y <= 9:
-                                col = C_HOODIE_HI if y == 9 and dz > 0 else (C_HOODIE if dz >= 0.2 and dx <= 0.2 else C_HOODIE_SH)
+                            # 向かって右脚（キャラ左脚）: 下黒ソックス(y=5) + 絶対領域白肌 + ガーターリング(y=7..8) + 白太もも＋白絆創膏(y=9..11)
+                            if y == 5:
+                                col = C_HOODIE_HI if dz > 0.2 else C_HOODIE_SH
                                 set_vox(vol, part, x, y, z, col, P_SOCKS)
                             else:
-                                col = C_SKIN_SH if (y >= 21 or dz < -0.6 or dx < -1.2) else C_SKIN
+                                col = C_SKIN_SH if (y >= 14 or dz < -0.6 or dx < -1.1) else C_SKIN
                                 set_vox(vol, part, x, y, z, col, P_SKIN)
 
-    # --- 左脚ディテール: フリル帯(y=15..17) + 外側リボン + 細黒ガーターストラップ(y=17..22) + 白十字 ---
+    # --- 左脚ディテール: フリル帯(y=9) + 白レース上縁(y=10) + 外側リボン + 細黒ガーターストラップ(y=10..15) + 白十字 ---
     lx_l = CX - leg_dx
-    # ニーハイ上端の360度黒フリル帯 (y=15..16) + 白レース上縁 (y=17)
-    for y_f in (15, 16, 17):
-        rx_f = 3.15 if y_f == 16 else (3.00 if y_f == 15 else 2.95)
-        rz_f = 3.25 if y_f == 16 else (3.10 if y_f == 15 else 3.05)
+    for y_f in (9, 10):
+        rx_f = 2.95 if y_f == 9 else 2.85
+        rz_f = 3.05 if y_f == 9 else 2.95
         for x in range(W):
             if abs(x - CX) < 1.05:
                 continue
@@ -347,39 +329,36 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 scallop = 0.22 * math.cos(8.0 * ang)
                 rad = math.sqrt((dx / (rx_f + scallop)) ** 2 + (dz / (rz_f + scallop)) ** 2)
                 if 0.72 <= rad <= 1.0:
-                    if y_f == 17:
-                        # 白レース縁のスカラップ
+                    if y_f == 10:
                         if math.cos(8.0 * ang) > -0.1:
                             set_vox(vol, part, x, y_f, z, C_WHITE_SH if dz < 0 else C_WHITE, P_SOCKS)
-                    elif y_f == 16:
-                        set_vox(vol, part, x, y_f, z, C_HOODIE_HI if (dz > 0 and math.cos(8.0 * ang) > 0) else C_HOODIE_SH, P_SOCKS)
                     else:
-                        set_vox(vol, part, x, y_f, z, C_DARK if dz < -0.5 else C_HOODIE_SH, P_SOCKS)
+                        set_vox(vol, part, x, y_f, z, C_HOODIE_HI if (dz > 0 and math.cos(8.0 * ang) > 0) else C_HOODIE_SH, P_SOCKS)
 
-    # 左脚外側の垂れ黒リボン (x=lx_l-3.5, y=13..16)
-    rib_x = int(round(lx_l - 3.2))
+    # 左脚外側の垂れ黒リボン (x=lx_l-3.0, y=7..9)
+    rib_x = int(round(lx_l - 3.0))
     rib_z = int(round(CZ_BODY + 0.5))
-    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_HOODIE_SH), (-3, C_DARK)):
-        set_vox(vol, part, rib_x, 16 + dy, rib_z, c_r, P_SOCKS)
-        set_vox(vol, part, rib_x, 16 + dy, rib_z - 1, C_DARK, P_SOCKS)
-        if dy in (-1, -2):
-            set_vox(vol, part, rib_x - 1, 16 + dy, rib_z, c_r, P_SOCKS)
+    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_DARK)):
+        set_vox(vol, part, rib_x, 9 + dy, rib_z, c_r, P_SOCKS)
+        set_vox(vol, part, rib_x, 9 + dy, rib_z - 1, C_DARK, P_SOCKS)
+        if dy == -1:
+            set_vox(vol, part, rib_x - 1, 9 + dy, rib_z, c_r, P_SOCKS)
 
-    # 左脚前面の細い黒ガーターストラップ (y=17..22) + 銀クリップ
+    # 左脚前面の細い黒ガーターストラップ (y=10..15) + 銀クリップ
     sx_l = int(round(lx_l))
-    for y_st in range(17, 23):
+    for y_st in range(10, 16):
         front_z = -1
         for z in range(D - 1, -1, -1):
             if vol[sx_l][y_st][z] != -1:
                 front_z = z
                 break
         if front_z >= 0:
-            col_st = C_GRAY_HI if y_st == 17 else C_DARK
+            col_st = C_GRAY_HI if y_st == 10 else C_DARK
             set_vox(vol, part, sx_l, y_st, front_z, col_st, P_SOCKS)
             set_vox(vol, part, sx_l, y_st, front_z + 1, col_st, P_SOCKS)
 
-    # 左ニーハイ前面の繊細白十字ワンポイント (y=11..13)
-    for y_c in (11, 12, 13):
+    # 左ニーハイ前面の繊細白十字ワンポイント (y=6..8)
+    for y_c in (6, 7, 8):
         front_z = -1
         for z in range(D - 1, -1, -1):
             if vol[sx_l][y_c][z] != -1:
@@ -388,12 +367,11 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
         if front_z >= 0:
             set_vox(vol, part, sx_l, y_c, front_z, C_WHITE, P_SOCKS)
 
-    # --- 右脚ディテール: 黒ガーターリング(y=12..14) + 外側リボン + 白い可愛い絆創膏(y=16..19) ---
-    # 右ガーターリングを左ニーハイ上端より下げて配置し、スカート裾(y=20)との間に絆創膏が映える白肌ウィンドウを確保する
+    # --- 右脚ディテール: 黒ガーターリング(y=7..8) + 外側リボン + 白い可愛い絆創膏(y=9..11) ---
     lx_r = CX + leg_dx
-    for y_g in (12, 13, 14):
-        rx_g = 3.15 if y_g == 13 else 3.05
-        rz_g = 3.25 if y_g == 13 else 3.15
+    for y_g in (7, 8):
+        rx_g = 2.95 if y_g == 8 else 2.88
+        rz_g = 3.05 if y_g == 8 else 2.98
         for x in range(W):
             if abs(x - CX) < 1.05:
                 continue
@@ -402,30 +380,29 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 dz = z - CZ_BODY
                 rad = math.sqrt((dx / rx_g) ** 2 + (dz / rz_g) ** 2)
                 if 0.72 <= rad <= 1.0:
-                    if y_g == 12 and dz > -0.5 and int(round(abs(dx) + abs(dz))) % 2 == 0:
+                    if y_g == 7 and dz > -0.5 and int(round(abs(dx) + abs(dz))) % 2 == 0:
                         set_vox(vol, part, x, y_g, z, C_WHITE_SH, P_SOCKS)
-                    elif y_g == 14:
+                    elif y_g == 8:
                         set_vox(vol, part, x, y_g, z, C_HOODIE_HI if dz > 0.3 else C_HOODIE_SH, P_SOCKS)
                     else:
                         set_vox(vol, part, x, y_g, z, C_HOODIE_SH if dz > -0.5 else C_DARK, P_SOCKS)
     # ガーターリング前面銀バックル
     sx_r = int(round(lx_r))
     for z in range(D - 1, -1, -1):
-        if vol[sx_r][13][z] != -1:
-            set_vox(vol, part, sx_r, 13, z, C_GRAY_HI, P_SOCKS)
-            set_vox(vol, part, sx_r, 13, z + 1, C_GRAY_HI, P_SOCKS)
+        if vol[sx_r][8][z] != -1:
+            set_vox(vol, part, sx_r, 8, z, C_GRAY_HI, P_SOCKS)
+            set_vox(vol, part, sx_r, 8, z + 1, C_GRAY_HI, P_SOCKS)
             break
-    # 右脚外側の垂れ黒リボン (x=lx_r+3.2, y=11..14)
-    rib_xr = int(round(lx_r + 3.2))
-    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_HOODIE_SH), (-3, C_DARK)):
-        set_vox(vol, part, rib_xr, 14 + dy, rib_z, c_r, P_SOCKS)
-        set_vox(vol, part, rib_xr, 14 + dy, rib_z - 1, C_DARK, P_SOCKS)
-        if dy in (-1, -2):
-            set_vox(vol, part, rib_xr + 1, 14 + dy, rib_z, c_r, P_SOCKS)
+    # 右脚外側の垂れ黒リボン (x=lx_r+3.0, y=6..8)
+    rib_xr = int(round(lx_r + 3.0))
+    for dy, c_r in ((0, C_HOODIE_HI), (-1, C_HOODIE), (-2, C_DARK)):
+        set_vox(vol, part, rib_xr, 8 + dy, rib_z, c_r, P_SOCKS)
+        set_vox(vol, part, rib_xr, 8 + dy, rib_z - 1, C_DARK, P_SOCKS)
+        if dy == -1:
+            set_vox(vol, part, rib_xr + 1, 8 + dy, rib_z, c_r, P_SOCKS)
 
-    # 右太もも前面〜外側の「白いちょっと可愛い絆創膏」 (y=16..19)
-    # 淡肌色(C_SKIN)に埋没しないよう上下左右の縁を C_WHITE_SH で縁取り、中央2x2にピンクガーゼを配置して正面・側面両方で鮮明に見せる
-    for y_b in (16, 17, 18, 19):
+    # 右太もも前面〜外側の「白いちょっと可愛い絆創膏」 (y=9..11, スカート裾y=13との間に1px白肌を確保)
+    for y_b in (9, 10, 11):
         for ox in (-2, -1, 0, 1, 2):
             vx = sx_r + ox
             front_z = -1
@@ -434,7 +411,7 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     front_z = z
                     break
             if front_z >= 0:
-                if y_b in (16, 19) or ox in (-2, 2):
+                if y_b in (9, 11) or ox in (-2, 2):
                     col_b = C_WHITE_SH
                 elif ox in (0, 1):
                     col_b = C_PINK_BAND
@@ -442,7 +419,6 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     col_b = C_WHITE
                 set_vox(vol, part, vx, y_b, front_z, col_b, P_SOCKS)
                 set_vox(vol, part, vx, y_b, front_z - 1, col_b, P_SOCKS)
-        # 側面(+90度)からも白ピンク絆創膏が可愛く見えるよう外側面カーブにも1列巻き込む
         for bz in (int(CZ_BODY), int(CZ_BODY + 1)):
             outer_x = -1
             for x in range(W - 1, sx_r, -1):
@@ -450,7 +426,7 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     outer_x = x
                     break
             if outer_x >= 0:
-                if y_b in (16, 19):
+                if y_b in (9, 11):
                     col_s = C_WHITE_SH
                 elif bz == int(CZ_BODY + 1):
                     col_s = C_PINK_BAND
@@ -459,12 +435,12 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 set_vox(vol, part, outer_x, y_b, bz, col_s, P_SOCKS)
 
     # ==========================================================================
-    # 3. 黒プリーツミニスカート (y=20..24) — 萌え袖と干渉せずくびれシルエットが出る幅に設計
+    # 3. 黒プリーツミニスカート (y=13..17) — 萌え袖と干渉せずくびれシルエットが出る幅に設計
     # ==========================================================================
-    for y in range(20, 25):
-        t = (y - 20.0) / 4.0
-        rx_sk = 9.0 - 1.5 * t
-        rz_sk = 7.0 - 1.1 * t
+    for y in range(13, 18):
+        t = (y - 13.0) / 4.0
+        rx_sk = 8.8 - 1.5 * t
+        rz_sk = 6.8 - 1.1 * t
         for x in range(W):
             for z in range(D):
                 dx = x - CX
@@ -473,10 +449,9 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 pleat = 0.44 * (1.0 - 0.5 * t) * math.cos(10.0 * ang)
                 rad = math.sqrt((dx / (rx_sk + pleat)) ** 2 + (dz / (rz_sk + pleat * 0.8)) ** 2)
                 if rad <= 1.0:
-                    # 裾内部を空洞にして脚を貫通させる
-                    if y <= 22 and rad < 0.65:
+                    if y <= 15 and rad < 0.65:
                         continue
-                    if y == 20 or math.cos(10.0 * ang) < -0.35:
+                    if y == 13 or math.cos(10.0 * ang) < -0.35:
                         col = C_DARK
                     elif dz > 0 and math.cos(10.0 * ang) > 0.35:
                         col = C_HOODIE
@@ -485,12 +460,13 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
     # ==========================================================================
-    # 4. 片方はだけた黒パーカー＋ライトグレーインナー＋半上げ銀ジップ＋後ろフード (y=22..34)
+    # 4. 片方はだけた黒パーカー＋ライトグレーインナー＋半上げ銀ジップ (y=15..26)
+    #    首行(y=27)と一切重ならないよう y=26 で肩・襟をすっきり止める
     # ==========================================================================
-    body_rx_pts = [(22.0, 8.4), (25.0, 7.9), (29.0, 7.2), (32.0, 6.5), (34.0, 5.2)]
-    body_rz_pts = [(22.0, 6.4), (25.0, 6.0), (29.0, 5.4), (32.0, 4.9), (34.0, 4.1)]
+    body_rx_pts = [(15.0, 8.2), (18.0, 7.7), (22.0, 7.0), (25.0, 6.2), (26.0, 4.9)]
+    body_rz_pts = [(15.0, 6.2), (18.0, 5.8), (22.0, 5.2), (25.0, 4.4), (26.0, 3.4)]
 
-    for y in range(22, 35):
+    for y in range(15, 27):
         rx_b = interp_profile(body_rx_pts, float(y))
         rz_b = interp_profile(body_rz_pts, float(y))
         for x in range(W):
@@ -499,92 +475,85 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 dz = z - CZ_BODY
                 rad = math.sqrt((dx / rx_b) ** 2 + (dz / rz_b) ** 2)
                 if rad <= 1.0:
-                    # 片方（向かって左肩 dx < 0）がずり落ちてライトグレーインナーが見える領域判定
                     is_front = dz > 0.0
-                    # V開き（上半分はグレーインナー露出、下半分 y=22..26 はチャック少し上げて閉じる！）
-                    if y >= 27:
-                        # y=27(中心)〜y=34(上)へ向かってV字＋左肩は大きくはだける
-                        u = (y - 27.0) / 7.0
-                        open_left = -(1.4 + 6.4 * (u ** 0.85))  # 向かって左は肩まで広くはだける！
-                        open_right = 1.2 + 2.7 * u              # 向かって右は通常の襟開き
+                    # V開き（上半分 y=20..26 はグレーインナー露出、下半分 y=15..19 はチャック少し上げて閉じる）
+                    if y >= 20:
+                        u = (y - 20.0) / 6.0
+                        open_left = -(1.4 + 6.2 * (u ** 0.85))
+                        open_right = 1.2 + 2.6 * u
                     else:
                         open_left = 1.0
                         open_right = -1.0
 
-                    # 肩上(y=30..34)の左側は背中寄りまでグレーインナー肩が見える
-                    is_off_shoulder_gray = (y >= 30 and dx <= -1.2 and dx >= -rx_b and dz >= -2.8)
+                    # 肩上(y=23..26)の左側は背中寄りまでグレーインナー肩が見える
+                    is_off_shoulder_gray = (y >= 23 and dx <= -1.2 and dx >= -rx_b and dz >= -2.6)
 
                     if is_front and open_left <= dx <= open_right:
-                        # 襟元の肌チラ見え (y=33..34, 中央付近)
-                        if y >= 33 and abs(dx) <= 2.3 and dz > 1.2:
-                            col = C_SKIN if y == 34 else C_SKIN_SH
-                            set_vox(vol, part, x, y, z, col, P_SKIN)
+                        # 襟元の鎖骨・首付け根の肌 (y=26 中央付近)
+                        if y == 26 and abs(dx) <= 2.3 and dz > 0.6:
+                            set_vox(vol, part, x, y, z, C_SKIN, P_SKIN)
                             continue
-                        elif y == 32 and abs(dx) <= 2.8 and dz > 1.4:
+                        elif y == 25 and abs(dx) <= 2.8 and dz > 1.2:
                             # クルーネック襟リブ
                             col = C_GRAY_SH
                         elif dx <= 0.0:
-                            col = C_GRAY_HI if y >= 29 else C_GRAY
+                            col = C_GRAY_HI if y >= 22 else C_GRAY
                         else:
-                            col = C_GRAY if y >= 29 else C_GRAY_SH
+                            col = C_GRAY if y >= 22 else C_GRAY_SH
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
                     elif is_off_shoulder_gray:
                         col = C_GRAY_HI if dz > -0.4 else C_GRAY
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
                     else:
-                        # 黒パーカー本体
-                        if y == 22:
+                        if y == 15:
                             col = C_DARK
                         elif rad >= 0.85 and dz > 0.5 and dx < -0.5:
                             col = C_HOODIE
                         elif dz < -1.2:
-                            col = C_HOODIE_SH if y >= 28 else C_DARK
+                            col = C_HOODIE_SH if y >= 21 else C_DARK
                         else:
                             col = C_HOODIE if dx < 0 else C_HOODIE_SH
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
-    # 銀ジッパー（V字前立て＋下半分 y=22..26 の中央半上げジップ＆引き手）
-    for y in range(22, 34):
-        if y <= 26:
-            # 半上げ中央銀ジップ
+    # 銀ジッパー（V字前立て＋下半分 y=15..19 の中央半上げジップ＆引き手）
+    for y in range(15, 27):
+        if y <= 19:
             zx = int(round(CX))
             for z in range(D - 1, int(CZ_BODY), -1):
                 if vol[zx][y][z] != -1:
-                    col_z = C_WHITE if y == 26 else (C_GRAY_HI if y >= 24 else C_GRAY)
+                    col_z = C_WHITE if y == 19 else (C_GRAY_HI if y >= 17 else C_GRAY)
                     set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
                     set_vox(vol, part, zx, y, z + 1, col_z, P_OUTFIT)
                     break
         else:
-            u = (y - 27.0) / 7.0
-            for zx_f in (CX - (1.5 + 6.0 * (u ** 0.85)), CX + (1.4 + 2.7 * u)):
+            u = (y - 20.0) / 6.0
+            for zx_f in (CX - (1.5 + 5.8 * (u ** 0.85)), CX + (1.4 + 2.6 * u)):
                 zx = int(round(zx_f))
-                if y >= 30 and zx_f < CX:
-                    continue  # 左肩ははだけて下にずり落ちた襟へ
+                if y >= 23 and zx_f < CX:
+                    continue
                 for z in range(D - 1, int(CZ_BODY), -1):
                     if vol[zx][y][z] != -1:
-                        col_z = C_GRAY_HI if y >= 30 else C_GRAY
+                        col_z = C_GRAY_HI if y >= 23 else C_GRAY
                         set_vox(vol, part, zx, y, z, col_z, P_OUTFIT)
                         break
 
     # 後ろフードは側面で後ろ髪の飛び出しに見えやすいため配置せず、ボブ〜黒パーカー背面のすっきりしたシルエットを優先する
 
     # ==========================================================================
-    # 5. 手元で布がダボッと丸く膨らんだ萌え袖両腕 (y=20..33)
-    #    スカート裾との間に明確なクビレの隙間を作り、袖先の丸みを引き立てる
+    # 5. 手元で布がダボッと丸く膨らんだ萌え袖両腕 (y=13..25)
     # ==========================================================================
-    arm_x_pts = [(20.0, 12.6), (22.0, 13.5), (24.5, 13.0), (27.5, 11.1), (30.5, 8.8), (32.5, 6.8)]
-    arm_z_pts = [(20.0, CZ_BODY + 1.5), (24.0, CZ_BODY + 1.1), (28.5, CZ_BODY + 0.5), (32.5, CZ_BODY + 0.1)]
-    arm_r_pts = [(20.0, 2.2), (21.0, 3.5), (22.5, 4.25), (24.5, 4.10), (27.5, 3.00), (30.5, 2.40), (32.5, 2.15)]
+    arm_x_pts = [(13.0, 12.2), (15.0, 13.1), (17.5, 12.6), (20.5, 10.8), (23.0, 8.6), (25.0, 6.6)]
+    arm_z_pts = [(13.0, CZ_BODY + 1.4), (17.0, CZ_BODY + 1.0), (21.0, CZ_BODY + 0.5), (25.0, CZ_BODY + 0.1)]
+    arm_r_pts = [(13.0, 2.1), (14.0, 3.4), (15.5, 4.10), (17.5, 3.95), (20.5, 2.90), (23.0, 2.35), (25.0, 2.10)]
 
     for side in (-1.0, 1.0):
-        for y in range(20, 34):
+        for y in range(13, 26):
             fy = float(y)
             ax = CX + side * interp_profile(arm_x_pts, fy)
             az = interp_profile(arm_z_pts, fy)
             ra = interp_profile(arm_r_pts, fy)
-            # 向かって左肩(side<0)ははだけているため、y=30..33をライトグレーのインナー半袖にする
-            is_gray_shoulder = (side < 0 and y >= 30)
-            is_slipped_cuff = (side < 0 and y == 29)
+            is_gray_shoulder = (side < 0 and y >= 23)
+            is_slipped_cuff = (side < 0 and y == 22)
             for x in range(W):
                 for z in range(D):
                     nx = (x - ax) / ra
@@ -594,16 +563,15 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         if is_gray_shoulder:
                             col = C_GRAY_HI if nz > -0.15 else C_GRAY
                         elif is_slipped_cuff and r2 > 0.55 and nz > -0.2:
-                            # はだけた黒パーカー肩口のリブ縁
                             col = C_HOODIE_HI
-                        elif y == 20:
+                        elif y == 13:
                             col = C_DARK
-                        elif y == 23 and r2 > 0.72 and nz > -0.3:
-                            col = C_DARK  # 手首の布だまりシワ影
-                        elif y == 24 and r2 > 0.72 and nz > 0.0:
-                            col = C_HOODIE_HI  # 布だまりハイライト
-                        elif 21 <= y <= 26 and ((side * nx) > 0.15 or nz > 0.35):
-                            col = C_HOODIE_SPEC if (side < 0 and 22 <= y <= 24 and nz > 0.55) else C_HOODIE_HI
+                        elif y == 16 and r2 > 0.72 and nz > -0.3:
+                            col = C_DARK
+                        elif y == 17 and r2 > 0.72 and nz > 0.0:
+                            col = C_HOODIE_HI
+                        elif 14 <= y <= 19 and ((side * nx) > 0.15 or nz > 0.35):
+                            col = C_HOODIE_SPEC if (side < 0 and 15 <= y <= 17 and nz > 0.55) else C_HOODIE_HI
                         elif nz < -0.45:
                             col = C_DARK
                         else:
@@ -611,22 +579,22 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
     # ==========================================================================
-    # 6. 首 (y=34) — よくんの指定通り1pxしっかり残して、もちっと顎を自然に支える！
+    # 6. 首 (y=27) — パーカー襟(y=26)と顎(y=28)の間に独立した1vox首を配置し、全角度でくっきり見せる
     # ==========================================================================
     for x in range(W):
         for z in range(D):
-            nx = (x - CX) / 2.8
-            nz = (z - CZ_BODY) / 2.5
+            nx = (x - CX) / 2.7
+            nz = (z - (CZ_BODY + 0.35)) / 2.5
             if nx * nx + nz * nz <= 1.0:
-                col = C_SKIN if (z >= CZ_BODY + 0.5 and abs(x - CX) <= 1.6) else C_SKIN_SH
-                set_vox(vol, part, x, 34, z, col, P_SKIN)
+                col = C_SKIN if (z >= CZ_BODY + 0.6 and abs(x - CX) <= 1.7) else C_SKIN_SH
+                set_vox(vol, part, x, 27, z, col, P_SKIN)
 
     # ==========================================================================
-    # 7. 頭部・顔・前髪・垂れ横髪・ジト目・ばってん＆白うさぎピン (y=35..54)
-    #    Char2 (sharp_jaw_hair=True, y_raw=27..46 -> y=y_raw+8) の輪郭・顔面・チーク・
+    # 7. 頭部・顔・前髪・垂れ横髪・ジト目・ばってん＆白うさぎピン (y=28..47)
+    #    Char2 (sharp_jaw_hair=True, y_raw=27..46 -> y=y_raw+1) の輪郭・顔面・チーク・
     #    前髪束＆目頭スリット・垂れ横髪・6x4ジト目を1:1座標で完全移植し、ゆの黒髪パレットで塗る
     # ==========================================================================
-    head_y_shift = 8  # Char2 y_raw=27..46 (sharp_jaw_hair時 y=26..45) -> char3 y=35..54
+    head_y_shift = 1  # Char2 y_raw=27..46 (sharp_jaw_hair時 y=26..45) -> char3 y=28..47
 
     rx_profile = [
         (26.0, 5.8),
@@ -701,17 +669,17 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                             col = C_SKIN
                     else:
                         if bangs_style == "yu_mix":
-                            # v3: 元の黒髪ドーム配色（頭頂は落ち着いた黒、y=49..51に横長の天使の輪ツヤ帯）
-                            if 49 <= y <= 51 and r_ell >= 0.80:
-                                if y == 50 and -4.5 <= dx <= 1.5 and dz >= -4.0:
+                            # v3: 元の黒髪ドーム配色（頭頂は落ち着いた黒、y=42..44に横長の天使の輪ツヤ帯）
+                            if 42 <= y <= 44 and r_ell >= 0.80:
+                                if y == 43 and -4.5 <= dx <= 1.5 and dz >= -4.0:
                                     col = C_HAIR_SPEC
-                                elif y in (49, 50) and int(round(adx)) not in (2, 7):
+                                elif y in (42, 43) and int(round(adx)) not in (2, 7):
                                     col = C_HAIR_HI
                                 else:
                                     col = C_HAIR
-                            elif y >= 52:
-                                col = C_HAIR_SH1 if (y == 54 and r_ell <= 0.24) else C_HAIR
-                            elif y >= 43:
+                            elif y >= 45:
+                                col = C_HAIR_SH1 if (y == 47 and r_ell <= 0.24) else C_HAIR
+                            elif y >= 36:
                                 col = C_HAIR if dz >= -1.5 else C_HAIR_SH1
                             else:
                                 col = C_HAIR_SH1 if dz >= -3.0 else C_HAIR_SH2
@@ -737,9 +705,9 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                                 col = C_HAIR_SH2
                     set_vox(vol, part, x, y, z, col, P_SKIN if is_face_zone else P_HAIR)
 
-    # 後ろ髪ボブの襟足カーブ (y=33..35, 正面の顎〜垂れ横髪間の抜け感を塞がないよう肩幅内に収める)
-    for y in range(33, 36):
-        t = (35.0 - y) / 2.0
+    # 後ろ髪ボブの襟足カーブ (y=26..28, 正面の顎〜垂れ横髪間の抜け感を塞がないよう肩幅内に収める)
+    for y in range(26, 29):
+        t = (28.0 - y) / 2.0
         rx_bk = 7.4 - 2.4 * t
         rz_bk = 7.6 - 1.4 * t
         for x in range(W):
@@ -750,7 +718,7 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                     continue
                 rad = math.sqrt((dx / rx_bk) ** 2 + (dz / rz_bk) ** 2)
                 if 0.60 <= rad <= 1.0:
-                    col = C_HAIR_SH2 if (y == 33 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
+                    col = C_HAIR_SH2 if (y == 26 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
     # 前髪造形: v2('char2') はChar2完全1:1、v3('yu_mix') は黒髪らしい繊細スリット＋細身中央束＋天使の輪ツヤ帯
@@ -799,31 +767,31 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                 r_b = (nx ** p_b + nz ** p_b) ** (1.0 / p_b)
                 if 0.77 <= r_b <= 1.0:
                     if bangs_style == "yu_mix":
-                        if 49 <= y <= 51 and adx <= 8.5:
-                            if y == 50 and -4.5 <= dx <= 1.5:
+                        if 42 <= y <= 44 and adx <= 8.5:
+                            if y == 43 and -4.5 <= dx <= 1.5:
                                 col = C_HAIR_SPEC
-                            elif y in (49, 50) and int(round(adx)) not in (2, 7):
+                            elif y in (42, 43) and int(round(adx)) not in (2, 7):
                                 col = C_HAIR_HI
-                            elif y == 51 and -5.5 <= dx <= 2.5 and int(round(adx)) not in (2, 7):
+                            elif y == 44 and -5.5 <= dx <= 2.5 and int(round(adx)) not in (2, 7):
                                 col = C_HAIR_HI
                             else:
                                 col = C_HAIR
-                        elif y >= 52:
+                        elif y >= 45:
                             col = C_HAIR
-                        elif y == 41:
+                        elif y == 34:
                             col = C_HAIR_SH2
-                        elif y == 42:
+                        elif y == 35:
                             if abs(adx - 1.5) < 0.45 or abs(adx - 4.5) < 0.45 or abs(dx + 6.5) < 0.45:
                                 col = C_HAIR_SH2
                             else:
                                 col = C_HAIR_SH1
-                        elif 43 <= y <= 45 and (
+                        elif 36 <= y <= 38 and (
                             abs(adx - 1.5) < 0.45
                             or abs(adx - 4.5) < 0.45
                             or abs(dx + 7.5) < 0.45
                         ):
-                            col = C_HAIR_SH2 if y <= 44 else C_HAIR_SH1
-                        elif adx >= 8.5 and y <= 48:
+                            col = C_HAIR_SH2 if y <= 37 else C_HAIR_SH1
+                        elif adx >= 8.5 and y <= 41:
                             col = C_HAIR_SH1
                         else:
                             col = C_HAIR
@@ -882,7 +850,7 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
                         set_vox(vol, part, x, y, z, col, P_HAIR)
 
     for y_c2 in range(25, 30):
-        y = y_c2 + 9  # Char2 sharp_jaw_hair の y=25..29 -> char3 y=34..38
+        y = y_c2 + 2  # Char2 sharp_jaw_hair の y=25..29 -> char3 y=27..31
         t_hang = clamp((29.0 - y_c2) / 4.0, 0.0, 1.0)
         lock_cx = 11.55 - 0.35 * t_hang
         lock_rx = 1.65 - 0.55 * (t_hang ** 1.2)
@@ -966,24 +934,24 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
             for z_fill in range(fill_min_z, z_surf + 1):
                 set_sym(lx, eye_y, z_fill, col, eye_part)
 
-    # 前髪ヘアアクセ2種（目頭スリットおよび目まつ毛 y=41 を一切塞がず、ベレー帽縁の下に収める）
+    # 前髪ヘアアクセ2種（目頭スリットおよび目まつ毛 y=34 を一切塞がず、ベレー帽縁の下に収める）
     if bangs_style == "yu_mix":
-        # v3: 天使の輪ツヤ帯(y=49..51)の下、暗い前髪上で白ピンが最もくっきり映える位置
-        b_pts = [(31, 49), (33, 49), (32, 48), (31, 47), (33, 47)]
+        # v3: 天使の輪ツヤ帯(y=42..44)の下、暗い前髪上で白ピンが最もくっきり映える位置
+        b_pts = [(31, 42), (33, 42), (32, 41), (31, 40), (33, 40)]
         u_pattern = [
-            (46, [(35, C_WHITE), (37, C_WHITE)]),
-            (45, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
-            (44, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
-            (43, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
+            (39, [(35, C_WHITE), (37, C_WHITE)]),
+            (38, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
+            (37, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
+            (36, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
         ]
     else:
-        # v2: Char2の縦長目頭スリット(x=32..33, y=42..44)を避けて配置
-        b_pts = [(30, 49), (32, 49), (31, 48), (30, 47), (32, 47)]
+        # v2: Char2の縦長目頭スリット(x=32..33, y=35..37)を避けて配置
+        b_pts = [(30, 42), (32, 42), (31, 41), (30, 40), (32, 40)]
         u_pattern = [
-            (47, [(35, C_WHITE), (37, C_WHITE)]),
-            (46, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
-            (45, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
-            (44, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
+            (40, [(35, C_WHITE), (37, C_WHITE)]),
+            (39, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
+            (38, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
+            (37, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
         ]
 
     for bx, by in b_pts:
@@ -1009,26 +977,24 @@ def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
 
 
 def stamp_ahoge(vol: list, part: list) -> list[tuple[int, int, int, int, int]]:
-    """頭頂(y=54)からぴょこんとカーブする可愛いアホ毛（ベレー帽ON時にremoveできるよう座標リストも返す）。"""
+    """頭頂(y=47)からぴょこんとカーブする可愛いアホ毛（ベレー帽ON時にremoveできるよう座標リストも返す）。"""
     pts = [
-        (28, 55, 21),
-        (28, 56, 21),
-        (27, 57, 21),
-        (26, 58, 20),
-        (25, 58, 20),
-        (24, 57, 20),
+        (28, 48, 21),
+        (28, 49, 21),
+        (27, 50, 21),
+        (26, 51, 20),
+        (25, 51, 20),
+        (24, 50, 20),
     ]
     added = []
     for x, y, z in pts:
-        # 6連結を保証するため前後の1voxブリッジも含めて繊細に繋ぐ
         set_vox(vol, part, x, y, z, C_HAIR_SH2, P_HAIR)
         added.append((x, y, z, C_HAIR_SH2, P_HAIR))
-    # (28,56,21)と(27,57,21)などの斜めを6連結にするため角1voxを繋ぐ
     bridges = [
-        (28, 57, 21),
-        (27, 58, 21),
-        (26, 58, 21),
-        (25, 57, 20),
+        (28, 50, 21),
+        (27, 51, 21),
+        (26, 51, 21),
+        (25, 50, 20),
     ]
     for x, y, z in bridges:
         set_vox(vol, part, x, y, z, C_HAIR_SH1, P_HAIR)
@@ -1039,20 +1005,18 @@ def stamp_ahoge(vol: list, part: list) -> list[tuple[int, int, int, int, int]]:
 def paint_half_twin_down(vol: list, part: list) -> None:
     """ベース髪型：ピンク丸位置（頭上サイド）から1vox空気スリットを空けて下向き＆毛先ハネのショートハーフツイン。"""
     for side in (-1.0, 1.0):
-        # 頭との接続ブリッジ（y=47..49, 滑らかな弧で繋いで水平角張りを防ぎつつ6連結維持）
         for x_off in (11.2, 12.2, 13.2):
             bx = int(round(CX + side * x_off))
-            for by in (47, 48):
+            for by in (40, 41):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
-        # 小さな黒結びリボン（外下）
         rx_k = int(round(CX + side * 13.8))
-        for by in (47, 48):
+        for by in (40, 41):
             set_vox(vol, part, rx_k, by, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
 
-        # 下向きショート毛束 (y=32..48): 頭から1vox空気スリットを保ちつつ下向き＋毛先ハネ！
-        for y in range(32, 49):
-            t = (48.0 - y) / 16.0
+        # 下向きショート毛束 (y=25..41)
+        for y in range(25, 42):
+            t = (41.0 - y) / 16.0
             x_off = 13.6 + 1.6 * math.sin(t * math.pi * 0.65) + (1.5 * ((t - 0.55) ** 1.4) if t > 0.55 else 0.0)
             z_off = -1.5 - 3.6 * (t ** 1.15) - (1.4 * ((t - 0.60) ** 1.4) if t > 0.60 else 0.0)
             r_t = 1.95 * (1.0 - 0.45 * (t ** 1.35))
@@ -1065,16 +1029,15 @@ def paint_half_twin_down(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 33:
+                        if y <= 26:
                             col = C_HAIR_SH2
-                        elif nz > 0.15 and 41 <= y <= 43:
+                        elif nz > 0.15 and 34 <= y <= 36:
                             col = C_HAIR_HI
                         elif nz > -0.2:
                             col = C_HAIR
                         else:
                             col = C_HAIR_SH1
                         set_vox(vol, part, x, y, z, col, P_HAIR)
-            # 外側の軽い2又ハネ房
             if 0.55 <= t <= 0.90:
                 fx = int(round(xc + side * (1.3 + 0.9 * (t - 0.55))))
                 fz = int(round(zc - 0.8))
@@ -1085,16 +1048,15 @@ def paint_half_twin_down(vol: list, part: list) -> None:
 def paint_half_flare(vol: list, part: list) -> None:
     """オプション髪型①（高め外ハネショート）：v1案Aの外ハネショートを約5px上の位置で結んだ軽やかシルエット。"""
     for side in (-1.0, 1.0):
-        # 頭との接続ブリッジ (y=47..49)
         for x_off in (11.2, 12.2, 13.2):
             bx = int(round(CX + side * x_off))
-            for by in (47, 48):
+            for by in (40, 41):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
 
-        # 外・後ろへふわっと弧を描いて2又に跳ねるショート毛束 (y=34..48)
-        for y in range(34, 49):
-            t = (48.0 - y) / 14.0
+        # 外・後ろへふわっと弧を描いて2又に跳ねるショート毛束 (y=27..41)
+        for y in range(27, 42):
+            t = (41.0 - y) / 14.0
             x_off = 13.4 + 3.7 * math.sin(t * math.pi * 0.70) + 1.1 * (t ** 1.45)
             z_off = -1.6 - 5.2 * math.sin(t * math.pi * 0.68) - 1.6 * (t ** 1.4)
             r_t = 2.25 * (0.82 + 0.26 * math.sin(t * math.pi * 0.62)) * (1.0 - 0.38 * (t ** 1.4))
@@ -1105,9 +1067,9 @@ def paint_half_flare(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 35:
+                        if y <= 28:
                             col = C_HAIR_SH2
-                        elif nz > 0.1 and 42 <= y <= 44:
+                        elif nz > 0.1 and 35 <= y <= 37:
                             col = C_HAIR_HI
                         elif nz > -0.25:
                             col = C_HAIR
@@ -1124,21 +1086,20 @@ def paint_half_flare(vol: list, part: list) -> None:
 def paint_twin_high(vol: list, part: list) -> None:
     """オプション髪型②（高め腰丈ツインテ＋ふっくら黒リボン＆淡紫ハート宝石＆白十字チャーム）。"""
     for side in (-1.0, 1.0):
-        # 頭との接続ブリッジ (y=48..50)
         for x_off in (10.5, 11.5, 12.5, 13.5):
             bx = int(round(CX + side * x_off))
-            for by in (48, 49, 50):
+            for by in (41, 42, 43):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
 
-        # 膨らみ控えめ・腰丈(y=19..49)のスラッと可愛い黒ツインテ
-        for y in range(19, 50):
-            t = (49.0 - y) / 30.0
+        # 膨らみ控えめ・腰丈(y=12..42)のスラッと可愛い黒ツインテ
+        for y in range(12, 43):
+            t = (42.0 - y) / 30.0
             x_off = 13.8 + 2.8 * math.sin(t * math.pi * 0.78) + 0.7 * math.sin(t * math.pi * 2.1)
             z_off = -1.6 - 5.6 * (t ** 0.88) - 1.2 * math.sin(t * math.pi * 2.0)
             r_t = 2.15 + 0.82 * math.sin(t * math.pi * 0.82)
-            if y <= 24:
-                r_t *= max(0.42, 1.0 - (25.0 - y) / 7.2)
+            if y <= 17:
+                r_t *= max(0.42, 1.0 - (18.0 - y) / 7.2)
             xc = CX + side * x_off
             zc = CZ_HEAD + z_off
             for x in range(W):
@@ -1146,9 +1107,9 @@ def paint_twin_high(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 20:
+                        if y <= 13:
                             col = C_HAIR_SH2
-                        elif nz > 0.2 and y in (43, 44, 33, 34, 26, 27):
+                        elif nz > 0.2 and y in (36, 37, 26, 27, 19, 20):
                             col = C_HAIR_HI
                         elif nz > -0.2:
                             col = C_HAIR
@@ -1156,9 +1117,9 @@ def paint_twin_high(vol: list, part: list) -> None:
                             col = C_HAIR_SH1
                         set_vox(vol, part, x, y, z, col, P_HAIR)
 
-        # ふっくら黒リボン＋中央淡紫ハート宝石＋垂れ白十字チャーム（黒髪と同化しないようリボン羽に明るめハイライトを添える）
+        # ふっくら黒リボン＋中央淡紫ハート宝石＋垂れ白十字チャーム
         rx_c = int(round(CX + side * 13.2))
-        ry_c = 49
+        ry_c = 42
         rz_c = int(CZ_HEAD + 0.5)
         for dx_r in range(-3, 4):
             for dy_r in range(-1, 2):
@@ -1174,14 +1135,12 @@ def paint_twin_high(vol: list, part: list) -> None:
                     else:
                         col_r = C_HOODIE if dz_r >= 0 else C_HOODIE_SH
                     set_vox(vol, part, rx_c + dx_r, ry_c + dy_r, rz_c + dz_r, col_r, P_ACC)
-        # 中央の淡紫ハート宝石＋繊細白枠（白四角になりすぎないよう中央3voxを宝石色＋四隅抜きで可愛く見せる）
         for dy_g in (-1, 0, 1):
             for dx_g in (-1, 0, 1):
                 if abs(dx_g) == 1 and dy_g == -1:
                     continue
                 c_g = C_LAVENDER_GEM if (dx_g == 0 and dy_g in (0, -1)) else C_WHITE
                 set_vox(vol, part, rx_c + dx_g, ry_c + dy_g, rz_c + 1, c_g, P_ACC)
-        # 垂れ白十字チャーム (y=45..47)
         for dy_c in (-2, -3, -4):
             set_vox(vol, part, rx_c, ry_c + dy_c, rz_c + 1, C_WHITE, P_ACC)
             set_vox(vol, part, rx_c, ry_c + dy_c, rz_c, C_WHITE_SH, P_ACC)
@@ -1192,22 +1151,20 @@ def paint_twin_high(vol: list, part: list) -> None:
 def paint_twin_arc(vol: list, part: list) -> None:
     """オプション髪型③（細身軽やかカーブツインテ・v1案C寄り：中腹で膨らみ毛先で柔らかく内側へ収まる弧）。"""
     for side in (-1.0, 1.0):
-        # 頭との接続ブリッジ（やや中〜高め y=44..46）
         for x_off in (11.5, 12.5, 13.5):
             bx = int(round(CX + side * x_off))
-            for by in (44, 45):
+            for by in (37, 38):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
-        # 小さめ黒結びリボン
         rx_k = int(round(CX + side * 13.6))
         for dx_k in (0, int(side)):
             for dy_k in (0, 1):
-                set_vox(vol, part, rx_k + dx_k, 45 + dy_k, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
-                set_vox(vol, part, rx_k + dx_k, 45 + dy_k, int(CZ_HEAD), C_HOODIE_SH, P_ACC)
+                set_vox(vol, part, rx_k + dx_k, 38 + dy_k, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
+                set_vox(vol, part, rx_k + dx_k, 38 + dy_k, int(CZ_HEAD), C_HOODIE_SH, P_ACC)
 
-        # 細身で外へ膨らみつつ毛先で柔らかく内側へ包む括弧カーブ (y=21..45)
-        for y in range(21, 46):
-            t = (45.0 - y) / 24.0
+        # 細身で外へ膨らみつつ毛先で柔らかく内側へ包む括弧カーブ (y=14..38)
+        for y in range(14, 39):
+            t = (38.0 - y) / 24.0
             x_off = 13.6 + 5.2 * math.sin(t * math.pi * 0.90) - 0.8 * (t ** 2.2)
             z_off = -1.6 - 6.4 * math.sin(t * math.pi * 0.74) - 1.8 * (t ** 1.5)
             r_t = 2.05 * (0.78 + 0.28 * math.sin(t * math.pi * 0.65)) * (1.0 - 0.44 * (t ** 1.5))
@@ -1218,9 +1175,9 @@ def paint_twin_arc(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 22:
+                        if y <= 15:
                             col = C_HAIR_SH2
-                        elif nz > 0.15 and y in (37, 38, 29, 30):
+                        elif nz > 0.15 and y in (30, 31, 22, 23):
                             col = C_HAIR_HI
                         elif nz > -0.25:
                             col = C_HAIR
@@ -1237,13 +1194,12 @@ def paint_twin_arc(vol: list, part: list) -> None:
 def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, int]]) -> dict:
     """
     斜め＆深め被りの立体黒ベレー帽Mod：
-    - 正面では向かって左へ斜め傾けて頭にすっぽり被せ（右のばってんy=47..49＆うさぎピンを邪魔しない）
+    - 正面では向かって左へ斜め傾けて頭にすっぽり被せ（右のばってんy=40..42＆うさぎピンを邪魔しない）
     - 側面では額ラインにしっかり被さりつつ、高くなりすぎない平べったいベレー形を保って後ろへふわっと垂れる
     - 縁のギャザー編み目＋右サイドの白十字架＋左縁の白レース付き小リボン
     """
     beret_map: dict[tuple[int, int, int], tuple[int, int]] = {}
     cx_b = CX - 1.0
-    # 丸く張り出したおでこドームを前面縁からしっかり包むよう中心Zと奥行半径をわずかに前寄りへ合わせる
     cz_b = CZ_HEAD - 1.4
 
     for x in range(W):
@@ -1254,24 +1210,19 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
             if r2 > 1.02:
                 continue
             r = math.sqrt(r2)
-            # 斜めチルト: 左(ux<0)へ約1.9vox深く被り、後ろ(uz<0)へ約1.8voxふわっと垂れる
             tilt = 1.9 * ux + 1.8 * uz
             dome = math.sqrt(max(0.0, 1.0 - min(1.0, r2 / 1.02)))
-            # 高さを抑えた丸みベレー冠（縦長シルクハット化を防ぐ）
-            y_top = int(round(52.0 + tilt + 4.7 * (dome ** 0.72)))
-            # 縁(r>0.82)は下側を少しすぼめて頭にフィットさせる
+            y_top = int(round(45.0 + tilt + 4.7 * (dome ** 0.72)))
             brim_tuck = 1.2 * smoothstep(0.75, 1.0, r)
-            y_bot = int(round(49.2 + tilt + brim_tuck))
+            y_bot = int(round(42.2 + tilt + brim_tuck))
             if y_top < y_bot:
                 continue
-            for y in range(max(44, y_bot), min(H, y_top + 1)):
-                # 頭の内部に完全埋没するボクセルはスキップし、表面〜外殻だけ上書き
+            for y in range(max(37, y_bot), min(H, y_top + 1)):
                 if vol_base[x][y][z] != -1 and r < 0.78 and y < y_top - 1:
                     continue
                 if y == y_bot:
                     col = C_DARK
                 elif y == y_bot + 1:
-                    # ギャザー編み目
                     ang_i = int(round((math.atan2(uz, ux) + math.pi) * 6.0))
                     col = C_HOODIE if (ang_i % 2 == 0) else C_DARK
                 elif y >= y_top - 1 and -0.45 <= ux <= 0.35 and -0.35 <= uz <= 0.55:
@@ -1282,8 +1233,8 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
                     col = C_HOODIE_SH
                 beret_map[(x, y, z)] = (col, P_BERET)
 
-    # ベレー帽向かって右前サイドの白十字架ワンポイント（表面フラッシュ埋め込みで側面からの出っ張りを防ぐ）
-    cross_cx, cross_cy = int(round(CX + 7.2)), 53
+    # ベレー帽向かって右前サイドの白十字架ワンポイント
+    cross_cx, cross_cy = int(round(CX + 7.2)), 46
     for dx_c, dy_c in ((0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (-1, 0), (1, 0)):
         vx, vy = cross_cx + dx_c, cross_cy + dy_c
         best_z = -1
@@ -1296,8 +1247,8 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
             if best_z - 1 >= 0 and (vx, vy, best_z - 1) in beret_map:
                 beret_map[(vx, vy, best_z - 1)] = (C_WHITE, P_BERET)
 
-    # 左縁の小さな黒リボン＆白レース添え（表面フラッシュ＋1vox最小厚で側面シルエットを綺麗に保つ）
-    rib_lx, rib_ly = int(round(CX - 11.8)), 49
+    # 左縁の小さな黒リボン＆白レース添え
+    rib_lx, rib_ly = int(round(CX - 11.8)), 42
     for dx_r in (-1, 0, 1):
         for dy_r in (-1, 0, 1):
             vx, vy = rib_lx + dx_r, rib_ly + dy_r

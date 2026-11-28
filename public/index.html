@@ -253,9 +253,19 @@
             </div>
           </div>
 
-          <div id="floating-options-bar" class="floating-options-bar" role="group" aria-label="クイックオプション切替" hidden></div>
+          <div id="floating-options-bar" class="floating-options-popover" role="region" aria-label="クイックオプション選択" hidden>
+            <div class="floating-options-head">
+              <span class="floating-options-title">オプション</span>
+              <button type="button" id="floating-options-close" class="floating-options-close" aria-label="オプション一覧を閉じる">×</button>
+            </div>
+            <div id="floating-options-list" class="floating-options-list" role="group" aria-label="クイックオプション切替"></div>
+          </div>
 
           <div id="floating-dock" class="floating-dock" role="toolbar" aria-label="クイック操作">
+            <button type="button" id="floating-options-toggle" class="m3-pill-btn floating-opt-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="floating-options-bar" hidden>
+              <span class="dock-btn-label">オプション</span>
+              <span id="floating-options-badge" class="dock-opt-badge" hidden>0</span>
+            </button>
             <button type="button" id="floating-autospin" class="m3-pill-btn" aria-pressed="false">
               自動回転: OFF
             </button>

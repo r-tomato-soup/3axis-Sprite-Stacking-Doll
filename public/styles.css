@@ -926,41 +926,121 @@ input[type="range"] {
   color: var(--hud-muted);
 }
 
-.floating-options-bar {
+.floating-options-popover {
   display: none;
   position: absolute;
   left: 50%;
-  bottom: calc(max(18px, env(safe-area-inset-bottom, 18px)) + 56px);
+  bottom: calc(max(18px, env(safe-area-inset-bottom, 18px)) + 58px);
   transform: translateX(-50%);
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-width: calc(100vw - 24px);
-  padding: 5px 7px;
+  width: min(304px, calc(100vw - 24px));
+  padding: 9px 10px 10px;
   border-radius: 16px;
   background: var(--dock-bg);
   border: 1px solid var(--dock-border);
   box-shadow: var(--dock-shadow);
-  backdrop-filter: blur(10px);
-  z-index: 29;
-  transition: opacity 0.18s ease, transform 0.2s ease;
+  backdrop-filter: blur(12px);
+  z-index: 33;
+  flex-direction: column;
+  gap: 7px;
+  transition: opacity 0.16s ease, transform 0.18s ease;
 }
 
-body.panels-collapsed .floating-options-bar {
+body.panels-collapsed .floating-options-popover {
+  display: flex;
+}
+
+.floating-options-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.floating-options-title {
+  font-size: 10.5px;
+  color: var(--accent-ivory);
+}
+
+.floating-options-close {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.floating-options-close:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.floating-options-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.floating-options-list.is-compact-row {
+  display: flex;
+  flex-wrap: nowrap;
 }
 
 .floating-opt-chip {
-  padding: 4px 9px;
-  font-size: 10px;
-  gap: 5px;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  gap: 6px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.floating-opt-chip .mod-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .floating-opt-chip .mod-chip-dot {
   width: 6px;
   height: 6px;
+}
+
+.floating-opt-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.floating-opt-trigger.has-active,
+.floating-opt-trigger[aria-expanded="true"] {
+  background: var(--dock-btn-pressed-bg);
+  border-color: var(--accent-lavender);
+  color: var(--dock-btn-pressed-text);
+}
+
+.dock-opt-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-lavender);
+  color: var(--accent-on-solid);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1;
 }
 
 .floating-dock {
@@ -1799,26 +1879,36 @@ body.panels-collapsed .floating-color-fab {
   body.mobile-sheet-open #gl-canvas {
     height: calc(100dvh - var(--mobile-sheet-height));
   }
-  .floating-options-bar {
-    display: inline-flex;
+  .floating-options-popover {
+    display: flex;
+    left: 12px;
+    transform: none;
+    width: min(304px, calc(100vw - 24px));
+    bottom: calc(max(18px, env(safe-area-inset-bottom, 18px)) + 54px);
   }
   .floating-dock {
     display: inline-flex;
-    max-width: calc(100vw - 92px);
-    gap: 6px;
+    left: 12px;
+    transform: none;
+    max-width: calc(100vw - 74px);
+    gap: 5px;
+    padding: 5px;
   }
   .floating-color-fab {
     display: block;
+    right: 12px;
+    width: 42px;
+    height: 42px;
   }
-  body.mobile-sheet-open .floating-options-bar {
+  body.mobile-sheet-open .floating-options-popover {
     opacity: 0;
     pointer-events: none;
-    transform: translate(-50%, 14px);
+    transform: translateY(14px);
   }
   body.mobile-sheet-open .floating-dock {
     opacity: 0;
     pointer-events: none;
-    transform: translate(-50%, 16px);
+    transform: translateY(16px);
   }
   body.mobile-sheet-open .floating-color-fab {
     opacity: 0;
@@ -1826,8 +1916,8 @@ body.panels-collapsed .floating-color-fab {
     transform: translateY(16px);
   }
   .m3-pill-btn {
-    padding: 8px 11px;
-    font-size: 11px;
+    padding: 8px 9px;
+    font-size: 10.5px;
   }
   .floating-mini-palette {
     display: none !important;
