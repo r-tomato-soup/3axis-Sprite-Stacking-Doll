@@ -175,8 +175,8 @@ def set_vox(vol: list, part: list, x: int, y: int, z: int, c: int, p: int) -> No
         part[x][y][z] = p
 
 
-def build_core_body(vol: list, part: list) -> None:
-    """ベース本体（靴・脚・スカート・片方はだけ黒パーカー＆萌え袖＆後ろフード・首・もちっと頭＆顔＆前髪＆アクセ）を構築する。"""
+def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix") -> None:
+    """ベース本体を構築する。bangs_style='char2' でv2(Char2完全1:1)、'yu_mix' でv3(Char2顔×黒髪前髪ニュアンス)を生成。"""
 
     # ==========================================================================
     # 1. 厚底プラットフォームゴス靴 (y=0..7) — ソール底面を丸めずフラット接地！
@@ -700,19 +700,35 @@ def build_core_body(vol: list, part: list) -> None:
                         else:
                             col = C_SKIN
                     else:
-                        if y_raw >= 42:
-                            if y_raw == 46 and r_ell <= 0.24:
-                                col = C_HAIR_SH1
-                            elif y_raw in (43, 44) and r_ell >= 0.85 and -3.5 <= dx <= 1.5 and dz < 4.5:
-                                col = C_HAIR_SPEC
+                        if bangs_style == "yu_mix":
+                            # v3: 元の黒髪ドーム配色（頭頂は落ち着いた黒、y=49..51に横長の天使の輪ツヤ帯）
+                            if 49 <= y <= 51 and r_ell >= 0.80:
+                                if y == 50 and -4.5 <= dx <= 1.5 and dz >= -4.0:
+                                    col = C_HAIR_SPEC
+                                elif y in (49, 50) and int(round(adx)) not in (2, 7):
+                                    col = C_HAIR_HI
+                                else:
+                                    col = C_HAIR
+                            elif y >= 52:
+                                col = C_HAIR_SH1 if (y == 54 and r_ell <= 0.24) else C_HAIR
+                            elif y >= 43:
+                                col = C_HAIR if dz >= -1.5 else C_HAIR_SH1
                             else:
-                                col = C_HAIR_HI
-                        elif y_raw >= 37:
-                            col = C_HAIR if dz < 1.8 else C_HAIR_HI
-                        elif y_raw >= 30:
-                            col = C_HAIR_SH1 if dz < -1.2 else C_HAIR
+                                col = C_HAIR_SH1 if dz >= -3.0 else C_HAIR_SH2
                         else:
-                            col = C_HAIR_SH2
+                            if y_raw >= 42:
+                                if y_raw == 46 and r_ell <= 0.24:
+                                    col = C_HAIR_SH1
+                                elif y_raw in (43, 44) and r_ell >= 0.85 and -3.5 <= dx <= 1.5 and dz < 4.5:
+                                    col = C_HAIR_SPEC
+                                else:
+                                    col = C_HAIR_HI
+                            elif y_raw >= 37:
+                                col = C_HAIR if dz < 1.8 else C_HAIR_HI
+                            elif y_raw >= 30:
+                                col = C_HAIR_SH1 if dz < -1.2 else C_HAIR
+                            else:
+                                col = C_HAIR_SH2
 
                         if dz < -3.4 and r_ell >= 0.84 and 28 <= y_raw <= 41:
                             t_back = (y_raw - 28.0) / 13.0
@@ -737,7 +753,7 @@ def build_core_body(vol: list, part: list) -> None:
                     col = C_HAIR_SH2 if (y == 33 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
-    # Char2 1:1移植: 重めレイヤー前髪（中央束＋縁影＋目頭ツイン縦肌スリット＋まつ毛上のフラット裾） (y_raw=32..45 -> y=40..53)
+    # 前髪造形: v2('char2') はChar2完全1:1、v3('yu_mix') は黒髪らしい繊細スリット＋細身中央束＋天使の輪ツヤ帯
     for y_raw in range(32, 46):
         fy = float(y_raw)
         y = y_raw + head_y_shift
@@ -751,14 +767,29 @@ def build_core_body(vol: list, part: list) -> None:
             adx = abs(dx)
             if adx > 11.2:
                 continue
-            if y_raw in (32, 33) and adx > 2.6:
-                continue
-            if y_raw == 34 and (3.2 <= adx <= 4.8):
-                continue
-            if y_raw == 35 and (3.2 <= adx <= 4.7):
-                continue
-            if y_raw == 36 and (3.3 <= adx <= 4.1):
-                continue
+
+            if bangs_style == "yu_mix":
+                # v3: Char2の縦長2x4白スリットを抑え、黒髪向け繊細レイヤー前髪（細身中央束＋1〜2px抜けスリット＋左目上1px抜け）にする
+                if y_raw == 32:
+                    continue
+                if y_raw == 33 and adx > 1.2:
+                    # 眉間中央にごく細い2px毛先 (x=28,29) だけ垂らし、目元をすっきり開ける
+                    continue
+                if y_raw == 34 and ((2.2 <= adx <= 3.8) or (-5.8 <= dx <= -5.2)):
+                    # 中央束(x=27..30)の両脇に柔らかな2px抜け(x=25..26, 31..32) + 左目上に1px抜け(x=23, adx=5.5<=5.6で肌が見える)
+                    continue
+                if y_raw == 35 and ((2.2 <= adx <= 2.8) or (-5.8 <= dx <= -5.2)):
+                    # 上段は1pxの繊細な抜け先(x=26, 31 と左目上 x=23)へ収束させ、額の縦割れ感を抑える
+                    continue
+            else:
+                if y_raw in (32, 33) and adx > 2.6:
+                    continue
+                if y_raw == 34 and (3.2 <= adx <= 4.8):
+                    continue
+                if y_raw == 35 and (3.2 <= adx <= 4.7):
+                    continue
+                if y_raw == 36 and (3.3 <= adx <= 4.1):
+                    continue
 
             for z in range(int(CZ_HEAD + 1), D):
                 dz = z - CZ_HEAD
@@ -767,30 +798,60 @@ def build_core_body(vol: list, part: list) -> None:
                 p_b = 2.15
                 r_b = (nx ** p_b + nz ** p_b) ** (1.0 / p_b)
                 if 0.77 <= r_b <= 1.0:
-                    if y_raw >= 42:
-                        col = C_HAIR_HI
-                    elif y_raw in (32, 33, 34) and abs(adx - 2.5) < 0.45:
-                        col = C_HAIR_SH2
-                    elif y_raw == 35 and abs(adx - 2.5) < 0.45:
-                        col = C_HAIR_SH1
-                    elif y_raw == 34 and abs(adx - 5.5) < 0.45:
-                        col = C_HAIR_SH2
-                    elif y_raw == 35 and abs(adx - 5.5) < 0.45:
-                        col = C_HAIR_SH1
-                    elif y_raw == 34 and 5.8 <= adx <= 9.6 and r_b >= 0.86:
-                        col = C_HAIR_SH1
-                    elif y_raw == 32 and adx <= 2.1:
-                        col = C_HAIR
-                    elif 33 <= y_raw <= 41 and r_b >= 0.87 and (
-                        (abs(dx + 0.5) < 0.45 and y_raw >= 33)
-                        or (abs(adx - 4.5) < 0.45 and y_raw >= 37)
-                        or (abs(adx - 7.5) < 0.45 and y_raw >= 36)
-                    ):
-                        col = C_HAIR_HI
-                    elif y_raw == 41:
-                        col = C_HAIR_HI if (int(round(adx)) % 2 == 0 or adx <= 2.5) else C_HAIR
+                    if bangs_style == "yu_mix":
+                        if 49 <= y <= 51 and adx <= 8.5:
+                            if y == 50 and -4.5 <= dx <= 1.5:
+                                col = C_HAIR_SPEC
+                            elif y in (49, 50) and int(round(adx)) not in (2, 7):
+                                col = C_HAIR_HI
+                            elif y == 51 and -5.5 <= dx <= 2.5 and int(round(adx)) not in (2, 7):
+                                col = C_HAIR_HI
+                            else:
+                                col = C_HAIR
+                        elif y >= 52:
+                            col = C_HAIR
+                        elif y == 41:
+                            col = C_HAIR_SH2
+                        elif y == 42:
+                            if abs(adx - 1.5) < 0.45 or abs(adx - 4.5) < 0.45 or abs(dx + 6.5) < 0.45:
+                                col = C_HAIR_SH2
+                            else:
+                                col = C_HAIR_SH1
+                        elif 43 <= y <= 45 and (
+                            abs(adx - 1.5) < 0.45
+                            or abs(adx - 4.5) < 0.45
+                            or abs(dx + 7.5) < 0.45
+                        ):
+                            col = C_HAIR_SH2 if y <= 44 else C_HAIR_SH1
+                        elif adx >= 8.5 and y <= 48:
+                            col = C_HAIR_SH1
+                        else:
+                            col = C_HAIR
                     else:
-                        col = C_HAIR
+                        if y_raw >= 42:
+                            col = C_HAIR_HI
+                        elif y_raw in (32, 33, 34) and abs(adx - 2.5) < 0.45:
+                            col = C_HAIR_SH2
+                        elif y_raw == 35 and abs(adx - 2.5) < 0.45:
+                            col = C_HAIR_SH1
+                        elif y_raw == 34 and abs(adx - 5.5) < 0.45:
+                            col = C_HAIR_SH2
+                        elif y_raw == 35 and abs(adx - 5.5) < 0.45:
+                            col = C_HAIR_SH1
+                        elif y_raw == 34 and 5.8 <= adx <= 9.6 and r_b >= 0.86:
+                            col = C_HAIR_SH1
+                        elif y_raw == 32 and adx <= 2.1:
+                            col = C_HAIR
+                        elif 33 <= y_raw <= 41 and r_b >= 0.87 and (
+                            (abs(dx + 0.5) < 0.45 and y_raw >= 33)
+                            or (abs(adx - 4.5) < 0.45 and y_raw >= 37)
+                            or (abs(adx - 7.5) < 0.45 and y_raw >= 36)
+                        ):
+                            col = C_HAIR_HI
+                        elif y_raw == 41:
+                            col = C_HAIR_HI if (int(round(adx)) % 2 == 0 or adx <= 2.5) else C_HAIR
+                        else:
+                            col = C_HAIR
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
     # Char2 1:1移植: 顔周りの横髪 (y_raw=28..41 -> y=36..49) + 顎下垂れ毛束 (y_c2=25..29 -> y=34..38)
@@ -905,9 +966,26 @@ def build_core_body(vol: list, part: list) -> None:
             for z_fill in range(fill_min_z, z_surf + 1):
                 set_sym(lx, eye_y, z_fill, col, eye_part)
 
-    # 前髪ヘアアクセ2種（目頭スリット x=32..33, y=42..44 および目まつ毛 y=41 を一切塞がず、ベレー帽縁の下に収める）
-    # (1) ばってん(✕)ヘアピン (x=30..32, y=47..49)
-    b_pts = [(30, 49), (32, 49), (31, 48), (30, 47), (32, 47)]
+    # 前髪ヘアアクセ2種（目頭スリットおよび目まつ毛 y=41 を一切塞がず、ベレー帽縁の下に収める）
+    if bangs_style == "yu_mix":
+        # v3: 天使の輪ツヤ帯(y=49..51)の下、暗い前髪上で白ピンが最もくっきり映える位置
+        b_pts = [(31, 49), (33, 49), (32, 48), (31, 47), (33, 47)]
+        u_pattern = [
+            (46, [(35, C_WHITE), (37, C_WHITE)]),
+            (45, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
+            (44, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
+            (43, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
+        ]
+    else:
+        # v2: Char2の縦長目頭スリット(x=32..33, y=42..44)を避けて配置
+        b_pts = [(30, 49), (32, 49), (31, 48), (30, 47), (32, 47)]
+        u_pattern = [
+            (47, [(35, C_WHITE), (37, C_WHITE)]),
+            (46, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
+            (45, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
+            (44, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
+        ]
+
     for bx, by in b_pts:
         front_z = -1
         for z in range(D - 1, int(CZ_HEAD), -1):
@@ -918,13 +996,6 @@ def build_core_body(vol: list, part: list) -> None:
             set_vox(vol, part, bx, by, front_z, C_WHITE, P_ACC)
             set_vox(vol, part, bx, by, front_z - 1, C_WHITE, P_ACC)
 
-    # (2) 小さい白いうさぎ顔ピン (x=34..38, y=44..47・目頭スリットと前髪裾影を避けて右目上に綺麗に配置)
-    u_pattern = [
-        (47, [(35, C_WHITE), (37, C_WHITE)]),
-        (46, [(34, C_WHITE), (35, C_WHITE), (36, C_WHITE), (37, C_WHITE), (38, C_WHITE)]),
-        (45, [(34, C_WHITE), (35, C_ACC_DARK), (36, C_WHITE), (37, C_ACC_DARK), (38, C_WHITE)]),
-        (44, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
-    ]
     for uy, row_items in u_pattern:
         for ux, uc in row_items:
             front_z = -1
@@ -1499,10 +1570,10 @@ def export_assets(vol_base: list, part_base: list, mods: list[dict], out_dir: st
     )
 
 
-def main() -> None:
-    # 共通コア本体（髪型オプション差し替え前のベース）
+def build_variant(bangs_style: str, out_dir: str, label: str) -> None:
+    print(f"=== Building char3 {label} (bangs_style={bangs_style}) -> {out_dir} ===")
     vol_core, part_core = new_grid()
-    build_core_body(vol_core, part_core)
+    build_core_body(vol_core, part_core, bangs_style=bangs_style)
     ahoge_list = stamp_ahoge(vol_core, part_core)
 
     # 1) デフォルトベース（下向きショート・ハーフツイン）
@@ -1511,7 +1582,7 @@ def main() -> None:
     paint_half_twin_down(vol_base, part_base)
     pruned_base = prune_floating_voxels(vol_base, part_base)
     if pruned_base:
-        print(f"[info] pruned floating in base: {pruned_base}")
+        print(f"[info] pruned floating in base ({label}): {pruned_base}")
 
     # 2) オプション髪型①: 高め外ハネショート
     vol_flare = [[row[:] for row in plane] for plane in vol_core]
@@ -1538,7 +1609,14 @@ def main() -> None:
         extract_diff_mod("hair_twin_arc", "細身ツインテ", "hair_style", vol_base, part_base, vol_ta, part_ta),
     ]
 
-    export_assets(vol_base, part_base, mods)
+    export_assets(vol_base, part_base, mods, out_dir=out_dir)
+
+
+def main() -> None:
+    # v2: Char2顔・前髪1:1移植版 -> public/assets/char3/v2/
+    build_variant("char2", os.path.join(ASSETS_DIR, "v2"), "v2 (Char2 1:1)")
+    # v3: Char2顔・目 × 元の黒髪前髪ニュアンス版 -> public/assets/char3/ (デフォルト)
+    build_variant("yu_mix", ASSETS_DIR, "v3 (Yu bangs mix)")
 
 
 if __name__ == "__main__":

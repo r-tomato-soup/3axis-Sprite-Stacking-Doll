@@ -283,7 +283,7 @@ function setUiTheme(theme) {
 function syncVersionSwitcherVisibility() {
   const ch = getActiveCharacter();
   const versions = ch?.versions || [];
-  const showVersions = isDevMode && versions.length > 1;
+  const showVersions = versions.length > 1;
   dom.topbarVersionHost.hidden = !showVersions;
   dom.mobileVersionHost.hidden = !showVersions;
 }
@@ -996,8 +996,9 @@ function updateStatusBadge(asset) {
     return;
   }
   dom.statusBadge.dataset.state = 'ready';
-  const verMeta = isDevMode ? ch?.versions?.find((v) => v.id === asset.versionId) : null;
-  const verPrefix = verMeta ? `${verMeta.id} · ` : '';
+  const showVer = isDevMode || (ch?.versions?.length || 0) > 1;
+  const verMeta = showVer ? ch?.versions?.find((v) => v.id === asset.versionId) : null;
+  const verPrefix = verMeta ? `${verMeta.label || verMeta.id} · ` : '';
   dom.statusBadge.textContent = `${verPrefix}${asset.name} (${asset.voxels.length.toLocaleString()} voxels)`;
 }
 
@@ -1306,7 +1307,7 @@ function renderCharacterSwitcher() {
 function renderVersionSwitcher() {
   const ch = getActiveCharacter();
   const versions = ch?.versions || [];
-  dom.versionSwitcher.innerHTML = '<span class="group-caption">版比較</span>';
+  dom.versionSwitcher.innerHTML = '<span class="group-caption">バージョン</span>';
   versions.forEach((ver) => {
     const btn = document.createElement('button');
     btn.type = 'button';

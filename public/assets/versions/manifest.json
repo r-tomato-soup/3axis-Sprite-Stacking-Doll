@@ -48,13 +48,29 @@
       "id": "char3",
       "name": "ゆ",
       "shortLabel": "ゆ",
-      "defaultVersion": "char3_v1",
+      "defaultVersion": "char3_v3",
       "versions": [
         {
           "id": "char3_v1",
-          "label": "v1: ゆ",
-          "shortLabel": "v1",
-          "description": "黒髪ハーフツイン・片方はだけパーカー・厚底靴（髪型3種・黒ベレー帽オプション対応）",
+          "label": "v1: 元のデザイン",
+          "shortLabel": "v1 元顔",
+          "description": "元の顔デザイン（大きめ紫ジト目・すっきり前髪）",
+          "basePath": "./assets/char3/v1/",
+          "model": "./assets/char3/v1/model.json"
+        },
+        {
+          "id": "char3_v2",
+          "label": "v2: キャラ2顔 1:1",
+          "shortLabel": "v2 キャラ2顔",
+          "description": "CHARACTER 2 (v5) の顔・目・前髪を1:1移植",
+          "basePath": "./assets/char3/v2/",
+          "model": "./assets/char3/v2/model.json"
+        },
+        {
+          "id": "char3_v3",
+          "label": "v3: 元の前髪ミックス",
+          "shortLabel": "v3 元の前髪",
+          "description": "CHARACTER 2 の可愛い顔・目 × 元の黒髪前髪ニュアンス",
           "basePath": "./assets/char3/",
           "model": "./assets/char3/model.json"
         }
