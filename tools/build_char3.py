@@ -465,17 +465,12 @@ def build_body_v4(vol: list, part: list) -> None:
                 dz = z - CZ_BODY
                 rad = math.sqrt((dx / rx_i) ** 2 + (dz / rz_i) ** 2)
                 if rad <= 1.0:
-                    # 広めのクルーネック襟ぐり: y=25 は鎖骨〜左肩寄りまで広く肌を見せ、y=24 中央も1px深く開ける
-                    is_wide_neck_skin = (
-                        (y == 25 and -3.6 <= dx <= 2.6 and dz > -0.3)
-                        or (y == 24 and -2.6 <= dx <= 2.0 and dz > 0.6)
-                    )
+                    # 広めのクルーネック襟ぐり: y=25 の1行だけ鎖骨〜左肩寄りまで広く肌を見せ、y=24 はリブにして首伸びを防ぐ
+                    is_wide_neck_skin = (y == 25 and -3.5 <= dx <= 2.6 and dz > -0.3)
                     if is_wide_neck_skin:
-                        col = C_SKIN if (y == 25 or abs(dx) <= 1.8) else C_SKIN_SH
+                        col = C_SKIN if abs(dx) <= 2.2 else C_SKIN_SH
                         set_vox(vol, part, x, y, z, col, P_SKIN)
-                    elif (y == 23 and -3.1 <= dx <= 2.5 and dz > 0.8) or (
-                        y == 24 and dz > 0.4 and (-3.7 <= dx < -2.6 or 2.0 < dx <= 2.9)
-                    ):
+                    elif y == 24 and -3.5 <= dx <= 2.6 and dz > 0.6:
                         # 広げた襟ぐりに沿うクルーネックリブ影
                         set_vox(vol, part, x, y, z, C_GRAY_SH, P_OUTFIT)
                     else:
@@ -605,29 +600,27 @@ def build_body_v4(vol: list, part: list) -> None:
                         set_vox(vol, part, x, y, z, col, P_OUTFIT)
 
     # ==========================================================================
-    # 6. 首 (y=26..27) — 独立2行(+1px)の華奢な首を配置し、斜め俯瞰・正面・真横の全てで美しく見せる
+    # 6. 首 (y=26) — 独立1行・キャラ2準拠の6px幅で首長ネッシー化を防ぎつつ華奢な首元をくっきり見せる
     # ==========================================================================
-    for y_n in (26, 27):
-        for x in range(W):
-            for z in range(D):
-                nx = (x - CX) / 2.55
-                nz = (z - (CZ_BODY + 0.30)) / 2.35
-                if nx * nx + nz * nz <= 1.0:
-                    if y_n == 27:
-                        # 顎直下は柔らかな肌影、正面中央のみ明るい肌で立体感を出す
-                        col = C_SKIN if (z >= CZ_BODY + 1.0 and abs(x - CX) <= 1.2) else C_SKIN_SH
-                    else:
-                        col = C_SKIN if (z >= CZ_BODY + 0.2 and abs(x - CX) <= 1.8) else C_SKIN_SH
-                    set_vox(vol, part, x, y_n, z, col, P_SKIN)
+    for x in range(W):
+        for z in range(D):
+            nx = (x - CX) / 2.85
+            nz = (z - (CZ_BODY + 0.35)) / 2.45
+            if nx * nx + nz * nz <= 1.0:
+                col = C_SKIN if (z >= CZ_BODY + 0.8 and abs(x - CX) <= 1.8) else C_SKIN_SH
+                set_vox(vol, part, x, 26, z, col, P_SKIN)
 
 
-def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix", body_style: str = "v3") -> None:
-    """ベース本体を構築する。body_style='v4' で華奢シルエット＋3Dはだけ＋2px首、bangs_style='char2'/'yu_mix' で前髪を切替。"""
+def build_core_body(vol: list, part: list, bangs_style: str = "yu_mix", body_style: str = "v3") -> int:
+    """ベース本体を構築し、頭部Yオフセット(v4=-1, v3=0)を返す。"""
     if body_style == "v4":
         build_body_v4(vol, part)
+        y_off = -1
     else:
         build_body_v3(vol, part)
-    build_head_and_face(vol, part, bangs_style=bangs_style, slim_back_bob=(body_style == "v4"))
+        y_off = 0
+    build_head_and_face(vol, part, bangs_style=bangs_style, slim_back_bob=(body_style == "v4"), y_off=y_off)
+    return y_off
 
 
 def build_body_v3(vol: list, part: list) -> None:
@@ -1045,13 +1038,19 @@ def build_body_v3(vol: list, part: list) -> None:
                 set_vox(vol, part, x, 27, z, col, P_SKIN)
 
 
-def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim_back_bob: bool = False) -> None:
+def build_head_and_face(
+    vol: list,
+    part: list,
+    bangs_style: str = "yu_mix",
+    slim_back_bob: bool = False,
+    y_off: int = 0,
+) -> None:
     # ==========================================================================
-    # 7. 頭部・顔・前髪・垂れ横髪・ジト目・ばってん＆白うさぎピン (y=28..47)
-    #    Char2 (sharp_jaw_hair=True, y_raw=27..46 -> y=y_raw+1) の輪郭・顔面・チーク・
+    # 7. 頭部・顔・前髪・垂れ横髪・ジト目・ばってん＆白うさぎピン (y=28+y_off..47+y_off)
+    #    Char2 (sharp_jaw_hair=True, y_raw=27..46 -> y=y_raw+1+y_off) の輪郭・顔面・チーク・
     #    前髪束＆目頭スリット・垂れ横髪・6x4ジト目を1:1座標で完全移植し、ゆの黒髪パレットで塗る
     # ==========================================================================
-    head_y_shift = 1  # Char2 y_raw=27..46 (sharp_jaw_hair時 y=26..45) -> char3 y=28..47
+    head_y_shift = 1 + y_off
 
     rx_profile = [
         (26.0, 5.8),
@@ -1126,17 +1125,18 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                             col = C_SKIN
                     else:
                         if bangs_style == "yu_mix":
-                            # v3: 元の黒髪ドーム配色（頭頂は落ち着いた黒、y=42..44に横長の天使の輪ツヤ帯）
-                            if 42 <= y <= 44 and r_ell >= 0.80:
-                                if y == 43 and -4.5 <= dx <= 1.5 and dz >= -4.0:
+                            y_ref = y - y_off
+                            # v3/v4: 元の黒髪ドーム配色（頭頂は落ち着いた黒、y_ref=42..44に横長の天使の輪ツヤ帯）
+                            if 42 <= y_ref <= 44 and r_ell >= 0.80:
+                                if y_ref == 43 and -4.5 <= dx <= 1.5 and dz >= -4.0:
                                     col = C_HAIR_SPEC
-                                elif y in (42, 43) and int(round(adx)) not in (2, 7):
+                                elif y_ref in (42, 43) and int(round(adx)) not in (2, 7):
                                     col = C_HAIR_HI
                                 else:
                                     col = C_HAIR
-                            elif y >= 45:
-                                col = C_HAIR_SH1 if (y == 47 and r_ell <= 0.24) else C_HAIR
-                            elif y >= 36:
+                            elif y_ref >= 45:
+                                col = C_HAIR_SH1 if (y_ref == 47 and r_ell <= 0.24) else C_HAIR
+                            elif y_ref >= 36:
                                 col = C_HAIR if dz >= -1.5 else C_HAIR_SH1
                             else:
                                 col = C_HAIR_SH1 if dz >= -3.0 else C_HAIR_SH2
@@ -1162,12 +1162,13 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                                 col = C_HAIR_SH2
                     set_vox(vol, part, x, y, z, col, P_SKIN if is_face_zone else P_HAIR)
 
-    # 後ろ髪ボブの襟足カーブ (y=26..28, 正面の顎〜垂れ横髪間の抜け感を塞がないよう肩幅内に収める)
-    for y in range(26, 29):
-        t = (28.0 - y) / 2.0
+    # 後ろ髪ボブの襟足カーブ (y=26+y_off..28+y_off, 正面の顎〜垂れ横髪間の抜け感を塞がないよう肩幅内に収める)
+    for y_ref in range(26, 29):
+        y = y_ref + y_off
+        t = (28.0 - y_ref) / 2.0
         rx_bk = 7.4 - 2.4 * t
         rz_bk = 7.6 - 1.4 * t
-        z_cut = -2.6 if (slim_back_bob and y <= 27) else -2.0
+        z_cut = -2.6 if (slim_back_bob and y_ref <= 27) else -2.0
         for x in range(W):
             for z in range(D):
                 dx = x - CX
@@ -1176,7 +1177,7 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                     continue
                 rad = math.sqrt((dx / rx_bk) ** 2 + (dz / rz_bk) ** 2)
                 if 0.60 <= rad <= 1.0:
-                    col = C_HAIR_SH2 if (y == 26 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
+                    col = C_HAIR_SH2 if (y_ref == 26 or int(round(abs(dx))) in (0, 4)) else C_HAIR_SH1
                     set_vox(vol, part, x, y, z, col, P_HAIR)
 
     # 前髪造形: v2('char2') はChar2完全1:1、v3('yu_mix') は黒髪らしい繊細スリット＋細身中央束＋天使の輪ツヤ帯
@@ -1225,31 +1226,32 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                 r_b = (nx ** p_b + nz ** p_b) ** (1.0 / p_b)
                 if 0.77 <= r_b <= 1.0:
                     if bangs_style == "yu_mix":
-                        if 42 <= y <= 44 and adx <= 8.5:
-                            if y == 43 and -4.5 <= dx <= 1.5:
+                        y_ref = y - y_off
+                        if 42 <= y_ref <= 44 and adx <= 8.5:
+                            if y_ref == 43 and -4.5 <= dx <= 1.5:
                                 col = C_HAIR_SPEC
-                            elif y in (42, 43) and int(round(adx)) not in (2, 7):
+                            elif y_ref in (42, 43) and int(round(adx)) not in (2, 7):
                                 col = C_HAIR_HI
-                            elif y == 44 and -5.5 <= dx <= 2.5 and int(round(adx)) not in (2, 7):
+                            elif y_ref == 44 and -5.5 <= dx <= 2.5 and int(round(adx)) not in (2, 7):
                                 col = C_HAIR_HI
                             else:
                                 col = C_HAIR
-                        elif y >= 45:
+                        elif y_ref >= 45:
                             col = C_HAIR
-                        elif y == 34:
+                        elif y_ref == 34:
                             col = C_HAIR_SH2
-                        elif y == 35:
+                        elif y_ref == 35:
                             if abs(adx - 1.5) < 0.45 or abs(adx - 4.5) < 0.45 or abs(dx + 6.5) < 0.45:
                                 col = C_HAIR_SH2
                             else:
                                 col = C_HAIR_SH1
-                        elif 36 <= y <= 38 and (
+                        elif 36 <= y_ref <= 38 and (
                             abs(adx - 1.5) < 0.45
                             or abs(adx - 4.5) < 0.45
                             or abs(dx + 7.5) < 0.45
                         ):
-                            col = C_HAIR_SH2 if y <= 37 else C_HAIR_SH1
-                        elif adx >= 8.5 and y <= 41:
+                            col = C_HAIR_SH2 if y_ref <= 37 else C_HAIR_SH1
+                        elif adx >= 8.5 and y_ref <= 41:
                             col = C_HAIR_SH1
                         else:
                             col = C_HAIR
@@ -1308,7 +1310,7 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                         set_vox(vol, part, x, y, z, col, P_HAIR)
 
     for y_c2 in range(25, 30):
-        y = y_c2 + 2  # Char2 sharp_jaw_hair の y=25..29 -> char3 y=27..31
+        y = y_c2 + 2 + y_off  # Char2 sharp_jaw_hair の y=25..29 -> char3 y=27+y_off..31+y_off
         t_hang = clamp((29.0 - y_c2) / 4.0, 0.0, 1.0)
         lock_cx = 11.55 - 0.35 * t_hang
         lock_rx = 1.65 - 0.55 * (t_hang ** 1.2)
@@ -1412,7 +1414,8 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
             (37, [(35, C_WHITE_SH), (36, C_WHITE_SH), (37, C_WHITE_SH)]),
         ]
 
-    for bx, by in b_pts:
+    for bx, by_ref in b_pts:
+        by = by_ref + y_off
         front_z = -1
         for z in range(D - 1, int(CZ_HEAD), -1):
             if vol[bx][by][z] != -1:
@@ -1422,7 +1425,8 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
             set_vox(vol, part, bx, by, front_z, C_WHITE, P_ACC)
             set_vox(vol, part, bx, by, front_z - 1, C_WHITE, P_ACC)
 
-    for uy, row_items in u_pattern:
+    for uy_ref, row_items in u_pattern:
+        uy = uy_ref + y_off
         for ux, uc in row_items:
             front_z = -1
             for z in range(D - 1, int(CZ_HEAD), -1):
@@ -1434,25 +1438,25 @@ def build_head_and_face(vol: list, part: list, bangs_style: str = "yu_mix", slim
                 set_vox(vol, part, ux, uy, front_z - 1, uc, P_ACC)
 
 
-def stamp_ahoge(vol: list, part: list) -> list[tuple[int, int, int, int, int]]:
-    """頭頂(y=47)からぴょこんとカーブする可愛いアホ毛（ベレー帽ON時にremoveできるよう座標リストも返す）。"""
+def stamp_ahoge(vol: list, part: list, y_off: int = 0) -> list[tuple[int, int, int, int, int]]:
+    """頭頂(y=47+y_off)からぴょこんとカーブする可愛いアホ毛（ベレー帽ON時にremoveできるよう座標リストも返す）。"""
     pts = [
-        (28, 48, 21),
-        (28, 49, 21),
-        (27, 50, 21),
-        (26, 51, 20),
-        (25, 51, 20),
-        (24, 50, 20),
+        (28, 48 + y_off, 21),
+        (28, 49 + y_off, 21),
+        (27, 50 + y_off, 21),
+        (26, 51 + y_off, 20),
+        (25, 51 + y_off, 20),
+        (24, 50 + y_off, 20),
     ]
     added = []
     for x, y, z in pts:
         set_vox(vol, part, x, y, z, C_HAIR_SH2, P_HAIR)
         added.append((x, y, z, C_HAIR_SH2, P_HAIR))
     bridges = [
-        (28, 50, 21),
-        (27, 51, 21),
-        (26, 51, 21),
-        (25, 50, 20),
+        (28, 50 + y_off, 21),
+        (27, 51 + y_off, 21),
+        (26, 51 + y_off, 21),
+        (25, 50 + y_off, 20),
     ]
     for x, y, z in bridges:
         set_vox(vol, part, x, y, z, C_HAIR_SH1, P_HAIR)
@@ -1460,21 +1464,21 @@ def stamp_ahoge(vol: list, part: list) -> list[tuple[int, int, int, int, int]]:
     return added
 
 
-def paint_half_twin_down(vol: list, part: list) -> None:
+def paint_half_twin_down(vol: list, part: list, y_off: int = 0) -> None:
     """ベース髪型：ピンク丸位置（頭上サイド）から1vox空気スリットを空けて下向き＆毛先ハネのショートハーフツイン。"""
     for side in (-1.0, 1.0):
         for x_off in (11.2, 12.2, 13.2):
             bx = int(round(CX + side * x_off))
-            for by in (40, 41):
+            for by in (40 + y_off, 41 + y_off):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
         rx_k = int(round(CX + side * 13.8))
-        for by in (40, 41):
+        for by in (40 + y_off, 41 + y_off):
             set_vox(vol, part, rx_k, by, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
 
-        # 下向きショート毛束 (y=25..41)
-        for y in range(25, 42):
-            t = (41.0 - y) / 16.0
+        for y_ref in range(25, 42):
+            y = y_ref + y_off
+            t = (41.0 - y_ref) / 16.0
             x_off = 13.6 + 1.6 * math.sin(t * math.pi * 0.65) + (1.5 * ((t - 0.55) ** 1.4) if t > 0.55 else 0.0)
             z_off = -1.5 - 3.6 * (t ** 1.15) - (1.4 * ((t - 0.60) ** 1.4) if t > 0.60 else 0.0)
             r_t = 1.95 * (1.0 - 0.45 * (t ** 1.35))
@@ -1487,9 +1491,9 @@ def paint_half_twin_down(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 26:
+                        if y_ref <= 26:
                             col = C_HAIR_SH2
-                        elif nz > 0.15 and 34 <= y <= 36:
+                        elif nz > 0.15 and 34 <= y_ref <= 36:
                             col = C_HAIR_HI
                         elif nz > -0.2:
                             col = C_HAIR
@@ -1503,18 +1507,18 @@ def paint_half_twin_down(vol: list, part: list) -> None:
                     set_vox(vol, part, fx + dx_f, y, fz, C_HAIR_SH1 if t < 0.78 else C_HAIR_SH2, P_HAIR)
 
 
-def paint_half_flare(vol: list, part: list) -> None:
+def paint_half_flare(vol: list, part: list, y_off: int = 0) -> None:
     """オプション髪型①（高め外ハネショート）：v1案Aの外ハネショートを約5px上の位置で結んだ軽やかシルエット。"""
     for side in (-1.0, 1.0):
         for x_off in (11.2, 12.2, 13.2):
             bx = int(round(CX + side * x_off))
-            for by in (40, 41):
+            for by in (40 + y_off, 41 + y_off):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
 
-        # 外・後ろへふわっと弧を描いて2又に跳ねるショート毛束 (y=27..41)
-        for y in range(27, 42):
-            t = (41.0 - y) / 14.0
+        for y_ref in range(27, 42):
+            y = y_ref + y_off
+            t = (41.0 - y_ref) / 14.0
             x_off = 13.4 + 3.7 * math.sin(t * math.pi * 0.70) + 1.1 * (t ** 1.45)
             z_off = -1.6 - 5.2 * math.sin(t * math.pi * 0.68) - 1.6 * (t ** 1.4)
             r_t = 2.25 * (0.82 + 0.26 * math.sin(t * math.pi * 0.62)) * (1.0 - 0.38 * (t ** 1.4))
@@ -1525,9 +1529,9 @@ def paint_half_flare(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 28:
+                        if y_ref <= 28:
                             col = C_HAIR_SH2
-                        elif nz > 0.1 and 35 <= y <= 37:
+                        elif nz > 0.1 and 35 <= y_ref <= 37:
                             col = C_HAIR_HI
                         elif nz > -0.25:
                             col = C_HAIR
@@ -1541,23 +1545,23 @@ def paint_half_flare(vol: list, part: list) -> None:
                     set_vox(vol, part, fx + dx_f, y, fz, C_HAIR_SH1 if t < 0.75 else C_HAIR_SH2, P_HAIR)
 
 
-def paint_twin_high(vol: list, part: list) -> None:
+def paint_twin_high(vol: list, part: list, y_off: int = 0) -> None:
     """オプション髪型②（高め腰丈ツインテ＋ふっくら黒リボン＆淡紫ハート宝石＆白十字チャーム）。"""
     for side in (-1.0, 1.0):
         for x_off in (10.5, 11.5, 12.5, 13.5):
             bx = int(round(CX + side * x_off))
-            for by in (41, 42, 43):
+            for by in (41 + y_off, 42 + y_off, 43 + y_off):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
 
-        # 膨らみ控えめ・腰丈(y=12..42)のスラッと可愛い黒ツインテ
-        for y in range(12, 43):
-            t = (42.0 - y) / 30.0
+        for y_ref in range(12, 43):
+            y = y_ref + y_off
+            t = (42.0 - y_ref) / 30.0
             x_off = 13.8 + 2.8 * math.sin(t * math.pi * 0.78) + 0.7 * math.sin(t * math.pi * 2.1)
             z_off = -1.6 - 5.6 * (t ** 0.88) - 1.2 * math.sin(t * math.pi * 2.0)
             r_t = 2.15 + 0.82 * math.sin(t * math.pi * 0.82)
-            if y <= 17:
-                r_t *= max(0.42, 1.0 - (18.0 - y) / 7.2)
+            if y_ref <= 17:
+                r_t *= max(0.42, 1.0 - (18.0 - y_ref) / 7.2)
             xc = CX + side * x_off
             zc = CZ_HEAD + z_off
             for x in range(W):
@@ -1565,9 +1569,9 @@ def paint_twin_high(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 13:
+                        if y_ref <= 13:
                             col = C_HAIR_SH2
-                        elif nz > 0.2 and y in (36, 37, 26, 27, 19, 20):
+                        elif nz > 0.2 and y_ref in (36, 37, 26, 27, 19, 20):
                             col = C_HAIR_HI
                         elif nz > -0.2:
                             col = C_HAIR
@@ -1575,9 +1579,8 @@ def paint_twin_high(vol: list, part: list) -> None:
                             col = C_HAIR_SH1
                         set_vox(vol, part, x, y, z, col, P_HAIR)
 
-        # ふっくら黒リボン＋中央淡紫ハート宝石＋垂れ白十字チャーム
         rx_c = int(round(CX + side * 13.2))
-        ry_c = 42
+        ry_c = 42 + y_off
         rz_c = int(CZ_HEAD + 0.5)
         for dx_r in range(-3, 4):
             for dy_r in range(-1, 2):
@@ -1606,23 +1609,23 @@ def paint_twin_high(vol: list, part: list) -> None:
         set_vox(vol, part, rx_c + 1, ry_c - 3, rz_c + 1, C_WHITE, P_ACC)
 
 
-def paint_twin_arc(vol: list, part: list) -> None:
+def paint_twin_arc(vol: list, part: list, y_off: int = 0) -> None:
     """オプション髪型③（細身軽やかカーブツインテ・v1案C寄り：中腹で膨らみ毛先で柔らかく内側へ収まる弧）。"""
     for side in (-1.0, 1.0):
         for x_off in (11.5, 12.5, 13.5):
             bx = int(round(CX + side * x_off))
-            for by in (37, 38):
+            for by in (37 + y_off, 38 + y_off):
                 for bz in (int(CZ_HEAD - 2), int(CZ_HEAD - 1), int(CZ_HEAD)):
                     set_vox(vol, part, bx, by, bz, C_HAIR_SH2, P_HAIR)
         rx_k = int(round(CX + side * 13.6))
         for dx_k in (0, int(side)):
             for dy_k in (0, 1):
-                set_vox(vol, part, rx_k + dx_k, 38 + dy_k, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
-                set_vox(vol, part, rx_k + dx_k, 38 + dy_k, int(CZ_HEAD), C_HOODIE_SH, P_ACC)
+                set_vox(vol, part, rx_k + dx_k, 38 + y_off + dy_k, int(CZ_HEAD + 1), C_HOODIE_HI, P_ACC)
+                set_vox(vol, part, rx_k + dx_k, 38 + y_off + dy_k, int(CZ_HEAD), C_HOODIE_SH, P_ACC)
 
-        # 細身で外へ膨らみつつ毛先で柔らかく内側へ包む括弧カーブ (y=14..38)
-        for y in range(14, 39):
-            t = (38.0 - y) / 24.0
+        for y_ref in range(14, 39):
+            y = y_ref + y_off
+            t = (38.0 - y_ref) / 24.0
             x_off = 13.6 + 5.2 * math.sin(t * math.pi * 0.90) - 0.8 * (t ** 2.2)
             z_off = -1.6 - 6.4 * math.sin(t * math.pi * 0.74) - 1.8 * (t ** 1.5)
             r_t = 2.05 * (0.78 + 0.28 * math.sin(t * math.pi * 0.65)) * (1.0 - 0.44 * (t ** 1.5))
@@ -1633,9 +1636,9 @@ def paint_twin_arc(vol: list, part: list) -> None:
                     nx = (x - xc) / r_t
                     nz = (z - zc) / (r_t * 1.05)
                     if nx * nx + nz * nz <= 1.0:
-                        if y <= 15:
+                        if y_ref <= 15:
                             col = C_HAIR_SH2
-                        elif nz > 0.15 and y in (30, 31, 22, 23):
+                        elif nz > 0.15 and y_ref in (30, 31, 22, 23):
                             col = C_HAIR_HI
                         elif nz > -0.25:
                             col = C_HAIR
@@ -1649,10 +1652,14 @@ def paint_twin_arc(vol: list, part: list) -> None:
                     set_vox(vol, part, fx + dx_f, y, fz, C_HAIR_SH1 if t < 0.74 else C_HAIR_SH2, P_HAIR)
 
 
-def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, int]]) -> dict:
+def build_beret_mod(
+    vol_base: list,
+    ahoge_list: list[tuple[int, int, int, int, int]],
+    y_off: int = 0,
+) -> dict:
     """
     斜め＆深め被りの立体黒ベレー帽Mod：
-    - 正面では向かって左へ斜め傾けて頭にすっぽり被せ（右のばってんy=40..42＆うさぎピンを邪魔しない）
+    - 正面では向かって左へ斜め傾けて頭にすっぽり被せ（右のばってん＆うさぎピンを邪魔しない）
     - 側面では額ラインにしっかり被さりつつ、高くなりすぎない平べったいベレー形を保って後ろへふわっと垂れる
     - 縁のギャザー編み目＋右サイドの白十字架＋左縁の白レース付き小リボン
     """
@@ -1670,12 +1677,12 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
             r = math.sqrt(r2)
             tilt = 1.9 * ux + 1.8 * uz
             dome = math.sqrt(max(0.0, 1.0 - min(1.0, r2 / 1.02)))
-            y_top = int(round(45.0 + tilt + 4.7 * (dome ** 0.72)))
+            y_top = int(round(45.0 + y_off + tilt + 4.7 * (dome ** 0.72)))
             brim_tuck = 1.2 * smoothstep(0.75, 1.0, r)
-            y_bot = int(round(42.2 + tilt + brim_tuck))
+            y_bot = int(round(42.2 + y_off + tilt + brim_tuck))
             if y_top < y_bot:
                 continue
-            for y in range(max(37, y_bot), min(H, y_top + 1)):
+            for y in range(max(37 + y_off, y_bot), min(H, y_top + 1)):
                 if vol_base[x][y][z] != -1 and r < 0.78 and y < y_top - 1:
                     continue
                 if y == y_bot:
@@ -1691,8 +1698,7 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
                     col = C_HOODIE_SH
                 beret_map[(x, y, z)] = (col, P_BERET)
 
-    # ベレー帽向かって右前サイドの白十字架ワンポイント
-    cross_cx, cross_cy = int(round(CX + 7.2)), 46
+    cross_cx, cross_cy = int(round(CX + 7.2)), 46 + y_off
     for dx_c, dy_c in ((0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (-1, 0), (1, 0)):
         vx, vy = cross_cx + dx_c, cross_cy + dy_c
         best_z = -1
@@ -1705,8 +1711,7 @@ def build_beret_mod(vol_base: list, ahoge_list: list[tuple[int, int, int, int, i
             if best_z - 1 >= 0 and (vx, vy, best_z - 1) in beret_map:
                 beret_map[(vx, vy, best_z - 1)] = (C_WHITE, P_BERET)
 
-    # 左縁の小さな黒リボン＆白レース添え
-    rib_lx, rib_ly = int(round(CX - 11.8)), 42
+    rib_lx, rib_ly = int(round(CX - 11.8)), 42 + y_off
     for dx_r in (-1, 0, 1):
         for dy_r in (-1, 0, 1):
             vx, vy = rib_lx + dx_r, rib_ly + dy_r
@@ -1982,13 +1987,13 @@ def export_assets(vol_base: list, part_base: list, mods: list[dict], out_dir: st
 def build_variant(bangs_style: str, out_dir: str, label: str, body_style: str = "v3") -> None:
     print(f"=== Building char3 {label} (bangs_style={bangs_style}, body_style={body_style}) -> {out_dir} ===")
     vol_core, part_core = new_grid()
-    build_core_body(vol_core, part_core, bangs_style=bangs_style, body_style=body_style)
-    ahoge_list = stamp_ahoge(vol_core, part_core)
+    y_off = build_core_body(vol_core, part_core, bangs_style=bangs_style, body_style=body_style)
+    ahoge_list = stamp_ahoge(vol_core, part_core, y_off=y_off)
 
     # 1) デフォルトベース（下向きショート・ハーフツイン）
     vol_base = [[row[:] for row in plane] for plane in vol_core]
     part_base = [[row[:] for row in plane] for plane in part_core]
-    paint_half_twin_down(vol_base, part_base)
+    paint_half_twin_down(vol_base, part_base, y_off=y_off)
     pruned_base = prune_floating_voxels(vol_base, part_base)
     if pruned_base:
         print(f"[info] pruned floating in base ({label}): {pruned_base}")
@@ -1996,23 +2001,23 @@ def build_variant(bangs_style: str, out_dir: str, label: str, body_style: str = 
     # 2) オプション髪型①: 高め外ハネショート
     vol_flare = [[row[:] for row in plane] for plane in vol_core]
     part_flare = [[row[:] for row in plane] for plane in part_core]
-    paint_half_flare(vol_flare, part_flare)
+    paint_half_flare(vol_flare, part_flare, y_off=y_off)
     prune_floating_voxels(vol_flare, part_flare)
 
     # 3) オプション髪型②: 高め腰丈ツインテ（リボン＋紫ハート＋白十字）
     vol_th = [[row[:] for row in plane] for plane in vol_core]
     part_th = [[row[:] for row in plane] for plane in part_core]
-    paint_twin_high(vol_th, part_th)
+    paint_twin_high(vol_th, part_th, y_off=y_off)
     prune_floating_voxels(vol_th, part_th)
 
     # 4) オプション髪型③: 細身軽やかカーブツインテ
     vol_ta = [[row[:] for row in plane] for plane in vol_core]
     part_ta = [[row[:] for row in plane] for plane in part_core]
-    paint_twin_arc(vol_ta, part_ta)
+    paint_twin_arc(vol_ta, part_ta, y_off=y_off)
     prune_floating_voxels(vol_ta, part_ta)
 
     mods = [
-        build_beret_mod(vol_base, ahoge_list),
+        build_beret_mod(vol_base, ahoge_list, y_off=y_off),
         extract_diff_mod("hair_flare", "外ハネショート", "hair_style", vol_base, part_base, vol_flare, part_flare),
         extract_diff_mod("hair_twin_high", "腰丈ツインテ", "hair_style", vol_base, part_base, vol_th, part_th),
         extract_diff_mod("hair_twin_arc", "細身ツインテ", "hair_style", vol_base, part_base, vol_ta, part_ta),
